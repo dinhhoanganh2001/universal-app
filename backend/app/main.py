@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import api_router
@@ -18,6 +18,18 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def log_cors_preflight(request: Request, call_next):
+        if request.method == "OPTIONS":
+            print(
+                "CORS preflight:",
+                f"origin={request.headers.get('origin')!r}",
+                f"method={request.headers.get('access-control-request-method')!r}",
+                f"headers={request.headers.get('access-control-request-headers')!r}",
+            )
+        return await call_next(request)
+
     app.include_router(api_router, prefix="/api")
 
     @app.get("/health", tags=["system"])
