@@ -28,6 +28,24 @@ class Transaction(Base):
     owner = relationship("User", back_populates="transactions")
 
 
+class MoneyCategory(Base):
+    __tablename__ = "money_categories"
+    __table_args__ = (UniqueConstraint("owner_id", "name", name="uq_money_category_owner_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    owner = relationship("User", back_populates="money_categories")
+
+
 class Budget(Base):
     __tablename__ = "budgets"
     __table_args__ = (UniqueConstraint("owner_id", "category", "month", name="uq_budget_owner_category_month"),)

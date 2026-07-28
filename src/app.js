@@ -1,7 +1,10 @@
 (function () {
   const STORAGE_KEY = "universal-app-state-v2";
+  const AUTH_STORAGE_KEY = "universal-app-auth-v1";
+  const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
+  const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
-  const categories = [
+  const defaultCategories = [
     "Salary",
     "Freelance",
     "Food",
@@ -56,39 +59,59 @@
     upload: "M12 21V9M7 14l5-5 5 5M5 3h14",
     refresh: "M21 12a9 9 0 0 1-15.4 6.4M3 12A9 9 0 0 1 18.4 5.6M18 2v4h-4M6 22v-4h4",
     edit: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z",
-    trash: "M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"
+    trash: "M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3",
+    logout: "M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-5M14 21h5a2 2 0 0 0 2-2",
+    user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z",
+    chevronLeft: "M15 18l-6-6 6-6",
+    chevronRight: "M9 18l6-6-6-6"
   };
 
   const state = loadState();
+  const auth = loadAuth();
+  const moneySync = {
+    loaded: false,
+    loading: false,
+    budgetMonth: "",
+    error: ""
+  };
+  let authMode = "login";
   let activeModuleId = "money";
   let editingId = null;
 
   const modules = [
     {
       id: "money",
-      label: "Tien",
+      label: "Tiền",
       description: "Dòng tiền, ngân sách và lịch sử giao dịch.",
       icon: "money",
       enabled: true,
       render: renderMoney
     },
     {
+      id: "categories",
+      label: "Danh mục",
+      description: "Tạo và chỉnh sửa danh mục tiền.",
+      icon: "projects",
+      enabled: true,
+      render: renderCategories
+    },
+    {
       id: "goals",
-      label: "Muc tieu",
+      label: "Mục tiêu",
       description: "Kế hoạch tiết kiệm và cột mốc sau này.",
       icon: "goals",
       enabled: false
     },
     {
       id: "projects",
-      label: "Du an",
+      label: "Dự án",
       description: "Quản lý dự án và công việc sau này.",
       icon: "projects",
       enabled: false
     },
     {
       id: "habits",
-      label: "Thoi quen",
+      label: "Thói quen",
       description: "Theo dõi thói quen và chuỗi ngày sau này.",
       icon: "habits",
       enabled: false
@@ -109,6 +132,8 @@
     return normalizeState({
       money: {
         transactions: demoTransactions(),
+        categories: defaultCategories,
+        categoryRecords: [],
         budgets: defaultBudgets,
         filters: {
           month: currentMonth(),
@@ -134,6 +159,9 @@
     return {
       money: {
         transactions: Array.isArray(money.transactions) ? money.transactions.map(normalizeTransaction).filter(Boolean) : [],
+        budgetRecords: Array.isArray(money.budgetRecords) ? money.budgetRecords.map(normalizeBudgetRecord).filter(Boolean) : [],
+        categoryRecords: Array.isArray(money.categoryRecords) ? money.categoryRecords.map(normalizeCategoryRecord).filter(Boolean) : [],
+        categories: normalizeCategories(money.categories),
         budgets,
         filters: {
           month,
@@ -142,6 +170,36 @@
           search: String(filters.search || "").slice(0, 100)
         }
       }
+    };
+  }
+
+  function normalizeCategories(values) {
+    const source = Array.isArray(values) && values.length ? values : defaultCategories;
+    return [...new Set(source.map((category) => String(category || "").trim()).filter(Boolean))].slice(0, 80);
+  }
+
+  function normalizeCategoryRecord(category) {
+    if (!category || typeof category !== "object") return null;
+
+    const name = String(category.name || "").trim().slice(0, 60);
+    if (!name) return null;
+
+    return {
+      id: category.id === undefined || category.id === null ? "" : String(category.id),
+      name
+    };
+  }
+
+  function normalizeBudgetRecord(budget) {
+    if (!budget || typeof budget !== "object") return null;
+
+    return {
+      id: budget.id === undefined || budget.id === null ? "" : String(budget.id),
+      category: String(budget.category || "Other").slice(0, 60),
+      month: /^\d{4}-\d{2}$/.test(String(budget.month)) ? String(budget.month) : currentMonth(),
+      limit: Math.max(0, Number(budget.limit || budget.limit_amount || 0)),
+      spent: Math.max(0, Number(budget.spent || budget.spent_amount || 0)),
+      percent: Math.max(0, Number(budget.percent || budget.percent_used || 0))
     };
   }
 
@@ -166,8 +224,43 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function loadAuth() {
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!stored) return { token: "", user: null };
+
+    try {
+      const parsed = JSON.parse(stored);
+      return {
+        token: String(parsed.token || ""),
+        user: parsed.user && typeof parsed.user === "object" ? parsed.user : null
+      };
+    } catch (error) {
+      console.warn("Unable to parse saved auth state.", error);
+      return { token: "", user: null };
+    }
+  }
+
+  function saveAuth() {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  }
+
+  function apiBaseUrl() {
+    return localStorage.getItem(API_BASE_STORAGE_KEY) || DEFAULT_API_BASE_URL;
+  }
+
+  function setApiBaseUrl(value) {
+    const normalized = String(value || "").trim().replace(/\/+$/, "");
+    localStorage.setItem(API_BASE_STORAGE_KEY, normalized || DEFAULT_API_BASE_URL);
+  }
+
   function currentMonth() {
     return new Date().toISOString().slice(0, 7);
+  }
+
+  function shiftMonth(month, offset) {
+    const [year, monthIndex] = month.split("-").map(Number);
+    const date = new Date(year, monthIndex - 1 + offset, 1, 12);
+    return date.toISOString().slice(0, 7);
   }
 
   function demoTransactions() {
@@ -236,6 +329,14 @@
 
   function app() {
     const root = document.querySelector("#app");
+    if (!auth.token) {
+      root.className = "auth-root";
+      root.innerHTML = renderAuth();
+      bindRoot(root);
+      return;
+    }
+
+    root.className = "app-shell";
     root.innerHTML = `
       <aside class="sidebar">
         <div class="brand">
@@ -249,21 +350,123 @@
           ${modules.map(moduleButton).join("")}
         </nav>
         <div class="sidebar-footer">
-          Dữ liệu đang lưu trên trình duyệt này. Hãy xuất bản sao lưu trước khi đổi thiết bị.
+          <div class="account-chip">
+            <span class="module-icon">${svgIcon("user")}</span>
+            <span>${escapeHtml(auth.user?.full_name || auth.user?.email || "Tài khoản")}</span>
+          </div>
+          <button class="module-button logout-button" data-action="logout">
+            <span class="module-icon">${svgIcon("logout")}</span>
+            <span>Đăng xuất</span>
+          </button>
         </div>
       </aside>
       <main class="main" id="main"></main>
-      <input class="hidden-file" id="import-file" type="file" accept="application/json">
     `;
 
-    if (!root.dataset.bound) {
-      root.addEventListener("click", handleClick);
-      root.addEventListener("input", handleInput);
-      root.addEventListener("change", handleChange);
-      root.addEventListener("submit", handleSubmit);
-      root.dataset.bound = "true";
-    }
+    bindRoot(root);
     renderActiveModule();
+    ensureMoneyLoaded();
+  }
+
+  function bindRoot(root) {
+    if (root.dataset.bound) return;
+
+    root.addEventListener("click", handleClick);
+    root.addEventListener("input", handleInput);
+    root.addEventListener("change", handleChange);
+    root.addEventListener("submit", handleSubmit);
+    root.dataset.bound = "true";
+  }
+
+  function renderAuth() {
+    const isRegister = authMode === "register";
+    return `
+      <main class="auth-shell">
+        <section class="auth-frame">
+          <div class="auth-showcase" aria-label="Universal App">
+            <div class="auth-brand">
+              <div class="brand-mark">U</div>
+              <div>
+                <strong>Universal App</strong>
+                <span>Money workspace</span>
+              </div>
+            </div>
+
+            <div class="showcase-copy">
+              <p class="eyebrow">Tài chính cá nhân</p>
+              <h1>Nắm rõ tiền vào và tiền ra.</h1>
+              <p>Một không gian gọn gàng để theo dõi giao dịch, ngân sách và số dư bằng VND.</p>
+            </div>
+
+            <div class="auth-preview" aria-hidden="true">
+              <div class="preview-top">
+                <span>Số dư hiện tại</span>
+                <strong>28.320.000 ₫</strong>
+              </div>
+              <div class="preview-metrics">
+                <div>
+                  <span>Thu nhập</span>
+                  <strong>52.000.000 ₫</strong>
+                </div>
+                <div>
+                  <span>Chi tiêu</span>
+                  <strong>23.680.000 ₫</strong>
+                </div>
+              </div>
+              <div class="preview-progress">
+                <div>
+                  <span>Ngân sách ăn uống</span>
+                  <strong>71%</strong>
+                </div>
+                <div class="progress" style="--value: 71%">
+                  <span></span>
+                </div>
+              </div>
+              <div class="preview-row">
+                <span>Nhà ở</span>
+                <strong>12.000.000 ₫</strong>
+              </div>
+              <div class="preview-row">
+                <span>Di chuyển</span>
+                <strong>650.000 ₫</strong>
+              </div>
+            </div>
+          </div>
+
+          <section class="auth-panel">
+            <div class="auth-copy">
+              <p class="eyebrow">${isRegister ? "Tạo tài khoản" : "Đăng nhập"}</p>
+              <h1>${isRegister ? "Tạo tài khoản mới" : "Đăng nhập tài khoản"}</h1>
+              <p>${isRegister ? "Dùng email và mật khẩu để bắt đầu lưu dữ liệu trên backend." : "Tiếp tục quản lý giao dịch và ngân sách của bạn."}</p>
+            </div>
+            <form class="auth-form" data-form="${isRegister ? "register" : "login"}">
+              ${isRegister ? `
+                <div class="field">
+                  <label for="auth-name">Họ tên</label>
+                  <input id="auth-name" name="full_name" type="text" autocomplete="name" placeholder="Nguyễn Văn A" required>
+                </div>
+              ` : ""}
+              <div class="field">
+                <label for="auth-email">Email</label>
+                <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+              </div>
+              <div class="field">
+                <label for="auth-password">Mật khẩu</label>
+                <input id="auth-password" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" minlength="8" placeholder="Tối thiểu 8 ký tự" required>
+              </div>
+              <div class="field">
+                <label for="auth-api">API URL</label>
+                <input id="auth-api" name="api_base_url" type="url" value="${escapeAttr(apiBaseUrl())}" required>
+              </div>
+              <button class="button" type="submit">${isRegister ? "Tạo tài khoản" : "Đăng nhập"}</button>
+            </form>
+            <button class="auth-switch" data-action="switch-auth-mode">
+              ${isRegister ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Tạo tài khoản"}
+            </button>
+          </section>
+        </section>
+      </main>
+    `;
   }
 
   function moduleButton(module) {
@@ -294,12 +497,10 @@
           <h1>Kiểm soát dòng tiền tháng này</h1>
           <p>Theo dõi tiền vào, tiền ra và những danh mục cần chú ý trước khi kết thúc tháng.</p>
         </div>
-        <div class="toolbar">
-          <button class="button secondary" data-action="import">${svgIcon("upload")}Nhập</button>
-          <button class="button secondary" data-action="export">${svgIcon("download")}Xuất</button>
-          <button class="button secondary" data-action="reset-demo">${svgIcon("refresh")}Dữ liệu mẫu</button>
-        </div>
       </section>
+
+      ${moneySync.loading ? `<div class="sync-banner">Đang đồng bộ dữ liệu với backend...</div>` : ""}
+      ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
 
       <section class="metric-grid" aria-label="Tổng quan tiền">
         <article class="metric">
@@ -310,12 +511,12 @@
         <article class="metric">
           <span>Thu nhập</span>
           <strong>${dollars.format(data.income)}</strong>
-          <small>${data.incomeCount} giao dich</small>
+          <small>${data.incomeCount} giao dịch</small>
         </article>
         <article class="metric">
           <span>Chi tiêu</span>
           <strong>${dollars.format(data.expenses)}</strong>
-          <small>${data.expenseCount} giao dich</small>
+          <small>${data.expenseCount} giao dịch</small>
         </article>
         <article class="metric">
           <span>Tỷ lệ tiết kiệm</span>
@@ -329,14 +530,18 @@
           <article class="panel">
             <div class="panel-header">
               <div>
-                <h2>Giao dich</h2>
+                <h2>Giao dịch</h2>
                 <p>${data.filteredTransactions.length} kết quả sau bộ lọc</p>
               </div>
             </div>
             <div class="filters">
-              <div class="field">
+              <div class="field month-field">
                 <label for="filter-month">Tháng</label>
-                <input id="filter-month" type="month" data-filter="month" value="${escapeAttr(state.money.filters.month)}">
+                <div class="month-control">
+                  <button type="button" data-action="previous-month" title="Tháng trước">${svgIcon("chevronLeft")}</button>
+                  <input id="filter-month" type="month" data-filter="month" value="${escapeAttr(state.money.filters.month)}">
+                  <button type="button" data-action="next-month" title="Tháng sau">${svgIcon("chevronRight")}</button>
+                </div>
               </div>
               <div class="field">
                 <label for="filter-type">Loại</label>
@@ -347,10 +552,10 @@
                 </select>
               </div>
               <div class="field">
-                <label for="filter-category">Danh muc</label>
+                <label for="filter-category">Danh mục</label>
                 <select id="filter-category" data-filter="category">
                   ${option("all", "Tất cả danh mục", state.money.filters.category)}
-                  ${categories.map((category) => option(category, categoryLabel(category), state.money.filters.category)).join("")}
+                  ${categoryOptions().map((category) => option(category, categoryLabel(category), state.money.filters.category)).join("")}
                 </select>
               </div>
               <div class="field">
@@ -366,7 +571,7 @@
           <article class="panel" style="margin-top: 18px;">
             <div class="panel-header">
               <div>
-                <h2>Chi tieu theo danh muc</h2>
+                <h2>Chi tiêu theo danh mục</h2>
                 <p>Phân bổ chi tiêu trong tháng đã chọn</p>
               </div>
             </div>
@@ -399,6 +604,76 @@
     `;
   }
 
+  function renderCategories() {
+    const items = categoryOptions();
+    const usedCounts = categoryUsageCounts();
+
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Danh mục</p>
+          <h1>Quản lý danh mục tiền</h1>
+          <p>Tạo danh mục riêng cho giao dịch và ngân sách. Khi đổi tên danh mục, lịch sử giao dịch và ngân sách liên quan sẽ được cập nhật theo.</p>
+        </div>
+      </section>
+
+      ${moneySync.loading ? `<div class="sync-banner">Đang đồng bộ danh mục với backend...</div>` : ""}
+      ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
+
+      <section class="panel category-manager">
+        <div class="panel-header">
+          <div>
+            <h2>Danh sách danh mục</h2>
+            <p>${items.length} danh mục có thể dùng trong giao dịch và ngân sách</p>
+          </div>
+        </div>
+        <div class="category-manager-body">
+          <form class="category-add" data-form="category">
+            <div class="field">
+              <label for="category-new-name">Tên danh mục</label>
+              <input id="category-new-name" name="name" type="text" maxlength="60" placeholder="Ví dụ: Cà phê" required>
+            </div>
+            <button class="button" type="submit">${svgIcon("plus")}Thêm danh mục</button>
+          </form>
+          <div class="category-definition-list">
+            ${state.money.categories.length ? state.money.categories.map((category) => categoryDefinitionRow(category, usedCounts)).join("") : `<div class="empty-state">Chưa có danh mục nào.</div>`}
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function categoryDefinitionRow(category, usedCounts) {
+    const categoryRecord = state.money.categoryRecords.find((item) => item.name === category);
+    const id = categoryRecord?.id || "";
+    const usageCount = usedCounts[category] || 0;
+
+    return `
+      <div class="category-definition-row">
+        <div class="field">
+          <label for="category-${escapeAttr(id || slug(category))}">Tên danh mục</label>
+          <input id="category-${escapeAttr(id || slug(category))}" data-category-name="${escapeAttr(id)}" data-original-name="${escapeAttr(category)}" type="text" value="${escapeAttr(category)}" maxlength="60" ${id ? "" : "disabled"}>
+        </div>
+        <div class="category-usage">
+          <span>${usageCount}</span>
+          <small>mục đang dùng</small>
+        </div>
+        <button class="button secondary icon" type="button" data-action="delete-category" data-category-id="${escapeAttr(id)}" title="Xóa danh mục" ${id ? "" : "disabled"}>${svgIcon("trash")}</button>
+      </div>
+    `;
+  }
+
+  function categoryUsageCounts() {
+    const counts = {};
+    state.money.transactions.forEach((transaction) => {
+      counts[transaction.category] = (counts[transaction.category] || 0) + 1;
+    });
+    state.money.budgetRecords.forEach((budget) => {
+      counts[budget.category] = (counts[budget.category] || 0) + 1;
+    });
+    return counts;
+  }
+
   function getMoneyViewData() {
     const filters = state.money.filters;
     const selectedMonth = filters.month || currentMonth();
@@ -421,13 +696,23 @@
     const balance = income - expenses;
     const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
     const categorySpend = categoryTotals(selectedMonthTransactions);
-    const budgetProgress = Object.entries(state.money.budgets)
-      .map(([category, limit]) => ({
-        category,
-        limit,
-        spent: categorySpend[category] || 0,
-        percent: limit > 0 ? Math.round(((categorySpend[category] || 0) / limit) * 100) : 0
-      }))
+    const budgetSource = auth.token && moneySync.loaded
+      ? state.money.budgetRecords
+      : state.money.budgetRecords.length
+      ? state.money.budgetRecords
+      : Object.entries(state.money.budgets).map(([category, limit]) => ({ id: "", category, limit }));
+    const budgetProgress = budgetSource
+      .map((budget) => {
+        const hasSyncedProgress = auth.token && moneySync.loaded && budget.spent !== undefined && budget.percent !== undefined;
+        const spent = hasSyncedProgress ? budget.spent : categorySpend[budget.category] || 0;
+        return {
+          id: budget.id,
+          category: budget.category,
+          limit: budget.limit,
+          spent,
+          percent: hasSyncedProgress ? budget.percent : budget.limit > 0 ? Math.round((spent / budget.limit) * 100) : 0
+        };
+      })
       .sort((a, b) => b.percent - a.percent);
 
     return {
@@ -458,12 +743,126 @@
     return `<option value="${escapeAttr(value)}" ${value === selected ? "selected" : ""}>${label}</option>`;
   }
 
+  function categoryOptions() {
+    const used = [
+      ...state.money.transactions.map((transaction) => transaction.category),
+      ...state.money.budgetRecords.map((budget) => budget.category),
+      ...Object.keys(state.money.budgets)
+    ];
+    return normalizeCategories([...state.money.categories, ...used]);
+  }
+
+  function categoryRecordFromApi(category) {
+    return {
+      id: String(category.id),
+      name: String(category.name || "").slice(0, 60)
+    };
+  }
+
   function categoryLabel(category) {
     return categoryLabels[category] || category;
   }
 
   function transactionTypeLabel(type) {
     return typeLabels[type] || type;
+  }
+
+  function mapTransactionFromApi(transaction) {
+    return normalizeTransaction({
+      id: transaction.id,
+      type: transaction.type,
+      category: transaction.category,
+      note: transaction.note,
+      amount: transaction.amount,
+      date: transaction.occurred_on
+    });
+  }
+
+  function mapTransactionToApi(transaction) {
+    return {
+      type: transaction.type,
+      category: transaction.category,
+      note: transaction.note,
+      amount: String(transaction.amount),
+      occurred_on: transaction.date
+    };
+  }
+
+  function budgetsFromApi(budgets) {
+    return budgets.reduce((result, budget) => {
+      result[budget.category] = Number(budget.limit_amount || 0);
+      return result;
+    }, {});
+  }
+
+  function budgetRecordFromApi(budget) {
+    return normalizeBudgetRecord({
+      id: budget.id,
+      category: budget.category,
+      month: budget.month,
+      limit_amount: budget.limit_amount,
+      spent_amount: budget.spent_amount,
+      percent_used: budget.percent_used
+    });
+  }
+
+  async function ensureMoneyLoaded() {
+    if (!auth.token || moneySync.loading) return;
+    if (moneySync.loaded && moneySync.budgetMonth === state.money.filters.month) return;
+    await loadMoneyFromApi();
+  }
+
+  async function loadMoneyFromApi() {
+    moneySync.loading = true;
+    moneySync.error = "";
+    renderActiveModule();
+
+    try {
+      const month = state.money.filters.month || currentMonth();
+      const [transactions, summary, categories] = await Promise.all([
+        apiRequest("/api/money/transactions"),
+        apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`),
+        loadCategoriesFromApi()
+      ]);
+      const budgets = summary.budgets || [];
+      state.money.transactions = transactions.map(mapTransactionFromApi);
+      state.money.budgetRecords = budgets.map(budgetRecordFromApi);
+      state.money.budgets = budgetsFromApi(budgets);
+      state.money.categoryRecords = categories.map(categoryRecordFromApi);
+      state.money.categories = normalizeCategories(state.money.categoryRecords.map((category) => category.name));
+      moneySync.loaded = true;
+      moneySync.budgetMonth = month;
+      saveState();
+    } catch (error) {
+      moneySync.error = error.message || "Không thể đồng bộ dữ liệu.";
+      if (String(error.message || "").includes("authentication")) {
+        auth.token = "";
+        auth.user = null;
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        app();
+        return;
+      }
+    } finally {
+      moneySync.loading = false;
+      if (auth.token && document.querySelector("#main")) {
+        renderActiveModule();
+      }
+    }
+  }
+
+  async function loadCategoriesFromApi() {
+    let categoryRecords = await apiRequest("/api/money/categories");
+    if (categoryRecords.length) return categoryRecords;
+
+    categoryRecords = await Promise.all(
+      defaultCategories.map((name) => (
+        apiRequest("/api/money/categories", {
+          method: "POST",
+          body: { name }
+        })
+      ))
+    );
+    return categoryRecords;
   }
 
   function transactionTable(transactions, formatter) {
@@ -523,7 +922,7 @@
         <div class="field">
           <label for="transaction-category">Danh mục</label>
           <select id="transaction-category" name="category" required>
-            ${categories.map((category) => option(category, categoryLabel(category), editing?.category || "Food")).join("")}
+            ${categoryOptions().map((category) => option(category, categoryLabel(category), editing?.category || "Food")).join("")}
           </select>
         </div>
         <div class="field">
@@ -543,16 +942,46 @@
   }
 
   function budgetList(items, formatter) {
-    if (!items.length) {
-      return `<div class="empty-state">Chưa có ngân sách nào.</div>`;
-    }
-
+    const usedCategories = new Set(items.map((item) => item.category));
+    const addOptions = categoryOptions()
+      .filter((category) => !usedCategories.has(category))
+      .map((category) => option(category, categoryLabel(category), ""));
+    const totalSpent = items.reduce((sum, item) => sum + Number(item.spent || 0), 0);
+    const totalLimit = items.reduce((sum, item) => sum + Number(item.limit || 0), 0);
+    const totalPercent = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
+    const totalClassName = totalPercent >= 100 ? "danger" : totalPercent >= 80 ? "warning" : "";
     return `
       <div class="budget-list">
+        <form class="budget-add" data-form="budget">
+          <div class="field">
+            <label for="budget-new-category">Danh mục</label>
+            <select id="budget-new-category" name="category" required>
+              ${addOptions.length ? addOptions.join("") : categoryOptions().map((category) => option(category, categoryLabel(category), "")).join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label for="budget-new-limit">Hạn mức</label>
+            <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="1000" placeholder="0" required>
+          </div>
+          <button class="button secondary" type="submit">${svgIcon("plus")}Thêm</button>
+        </form>
+        ${items.length ? `
+          <div class="budget-total">
+            <div class="row-top">
+              <strong>Tổng ngân sách</strong>
+              <span>${formatter.format(totalSpent)} / ${formatter.format(totalLimit)}</span>
+            </div>
+            <div class="progress ${totalClassName}" style="--value: ${Math.min(totalPercent, 100)}%">
+              <span></span>
+            </div>
+            <small>${totalPercent}% đã dùng trong tháng</small>
+          </div>
+        ` : ""}
+        ${items.length ? "" : `<div class="empty-state">Chưa có ngân sách nào. Thêm danh mục để bắt đầu theo dõi.</div>`}
         ${items.map((item) => {
           const className = item.percent >= 100 ? "danger" : item.percent >= 80 ? "warning" : "";
           return `
-            <div class="budget-row">
+            <div class="budget-row" data-budget-row="${escapeAttr(item.id)}">
               <div class="row-top">
                 <strong>${escapeHtml(categoryLabel(item.category))}</strong>
                 <span>${formatter.format(item.spent)} / ${formatter.format(item.limit)}</span>
@@ -560,9 +989,18 @@
               <div class="progress ${className}" style="--value: ${Math.min(item.percent, 100)}%">
                 <span></span>
               </div>
-              <div class="field">
-                <label for="budget-${slug(item.category)}">Hạn mức tháng</label>
-                <input id="budget-${slug(item.category)}" data-budget="${escapeAttr(item.category)}" type="number" min="0" step="1000" value="${item.limit}">
+              <div class="budget-edit-grid">
+                <div class="field">
+                  <label for="budget-category-${escapeAttr(item.id || slug(item.category))}">Danh mục</label>
+                  <select id="budget-category-${escapeAttr(item.id || slug(item.category))}" data-budget-category="${escapeAttr(item.id)}">
+                    ${categoryOptions().map((category) => option(category, categoryLabel(category), item.category)).join("")}
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="budget-${escapeAttr(item.id || slug(item.category))}">Hạn mức tháng</label>
+                  <input id="budget-${escapeAttr(item.id || slug(item.category))}" data-budget-limit="${escapeAttr(item.id)}" type="number" min="0" step="1000" value="${item.limit}">
+                </div>
+                <button class="button secondary icon budget-remove" type="button" data-action="delete-budget" data-budget-id="${escapeAttr(item.id)}" title="Xóa ngân sách">${svgIcon("trash")}</button>
               </div>
             </div>
           `;
@@ -590,7 +1028,7 @@
     `;
   }
 
-  function handleClick(event) {
+  async function handleClick(event) {
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
 
@@ -600,13 +1038,46 @@
       app();
     }
 
+    if (action === "switch-auth-mode") {
+      authMode = authMode === "login" ? "register" : "login";
+      app();
+    }
+
+    if (action === "previous-month" || action === "next-month") {
+      state.money.filters.month = shiftMonth(
+        state.money.filters.month || currentMonth(),
+        action === "previous-month" ? -1 : 1
+      );
+      moneySync.loaded = false;
+      saveState();
+      renderActiveModule();
+      ensureMoneyLoaded();
+    }
+
+    if (action === "logout") {
+      auth.token = "";
+      auth.user = null;
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      editingId = null;
+      app();
+      showToast("Đã đăng xuất.");
+    }
+
     if (action === "edit-transaction") {
       editingId = actionTarget.dataset.id;
       renderActiveModule();
     }
 
     if (action === "delete-transaction") {
-      deleteTransaction(actionTarget.dataset.id);
+      await deleteTransaction(actionTarget.dataset.id);
+    }
+
+    if (action === "delete-budget") {
+      await deleteBudget(actionTarget.dataset.budgetId);
+    }
+
+    if (action === "delete-category") {
+      await deleteCategory(actionTarget.dataset.categoryId);
     }
 
     if (action === "cancel-edit") {
@@ -623,11 +1094,7 @@
     }
 
     if (action === "reset-demo") {
-      state.money.transactions = demoTransactions();
-      state.money.budgets = { ...defaultBudgets };
-      state.money.filters = { month: currentMonth(), type: "all", category: "all", search: "" };
-      editingId = null;
-      saveAndRender("Đã khôi phục dữ liệu mẫu.");
+      await resetDemoData();
     }
   }
 
@@ -638,7 +1105,7 @@
     }
   }
 
-  function handleChange(event) {
+  async function handleChange(event) {
     if (event.target.id === "import-file") {
       importData(event.target.files[0]);
       event.target.value = "";
@@ -648,17 +1115,54 @@
       state.money.filters[event.target.dataset.filter] = event.target.value;
       saveState();
       renderActiveModule();
+      ensureMoneyLoaded();
     }
 
-    if (event.target.matches("[data-budget]")) {
-      const category = event.target.dataset.budget;
-      state.money.budgets[category] = Number(event.target.value || 0);
-      saveState();
-      renderActiveModule();
+    if (event.target.matches("[data-budget-limit]")) {
+      await updateBudget(event.target.dataset.budgetLimit, {
+        limit_amount: String(Number(event.target.value || 0))
+      });
+    }
+
+    if (event.target.matches("[data-budget-category]")) {
+      await updateBudget(event.target.dataset.budgetCategory, {
+        category: event.target.value
+      });
+    }
+
+    if (event.target.matches("[data-category-name]")) {
+      const nextName = event.target.value.trim();
+      const previousName = event.target.dataset.originalName;
+      if (nextName && nextName !== previousName) {
+        await updateCategory(event.target.dataset.categoryName, nextName);
+      } else {
+        event.target.value = previousName;
+      }
     }
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
+    const authForm = event.target.closest("[data-form='login'], [data-form='register']");
+    if (authForm) {
+      event.preventDefault();
+      await submitAuth(authForm);
+      return;
+    }
+
+    const budgetForm = event.target.closest("[data-form='budget']");
+    if (budgetForm) {
+      event.preventDefault();
+      await createBudget(budgetForm);
+      return;
+    }
+
+    const categoryForm = event.target.closest("[data-form='category']");
+    if (categoryForm) {
+      event.preventDefault();
+      await createCategory(categoryForm);
+      return;
+    }
+
     const form = event.target.closest("[data-form='transaction']");
     if (!form) return;
 
@@ -666,7 +1170,7 @@
     const formData = new FormData(form);
     const id = String(formData.get("id") || "");
     const transaction = {
-      id: id || newId(),
+      id,
       type: String(formData.get("type")),
       date: String(formData.get("date")),
       category: String(formData.get("category")),
@@ -679,20 +1183,267 @@
       return;
     }
 
-    if (id) {
-      state.money.transactions = state.money.transactions.map((item) => item.id === id ? transaction : item);
-      editingId = null;
-      saveAndRender("Đã cập nhật giao dịch.");
-    } else {
-      state.money.transactions.unshift(transaction);
-      saveAndRender("Đã thêm giao dịch.");
+    try {
+      if (id) {
+        const updated = await apiRequest(`/api/money/transactions/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: mapTransactionToApi(transaction)
+        });
+        state.money.transactions = state.money.transactions.map((item) => item.id === id ? mapTransactionFromApi(updated) : item);
+        editingId = null;
+        saveAndRender("Đã cập nhật giao dịch.");
+      } else {
+        const created = await apiRequest("/api/money/transactions", {
+          method: "POST",
+          body: mapTransactionToApi(transaction)
+        });
+        state.money.transactions.unshift(mapTransactionFromApi(created));
+        saveAndRender("Đã thêm giao dịch.");
+      }
+      await loadMoneyFromApi();
+    } catch (error) {
+      showToast(error.message || "Không thể lưu giao dịch.");
     }
   }
 
-  function deleteTransaction(id) {
-    state.money.transactions = state.money.transactions.filter((transaction) => transaction.id !== id);
-    if (editingId === id) editingId = null;
-    saveAndRender("Đã xóa giao dịch.");
+  async function submitAuth(form) {
+    const formData = new FormData(form);
+    const mode = form.dataset.form;
+    const apiUrl = String(formData.get("api_base_url") || DEFAULT_API_BASE_URL);
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
+    const fullName = String(formData.get("full_name") || "").trim();
+
+    setApiBaseUrl(apiUrl);
+
+    if (!email || !password || (mode === "register" && !fullName)) {
+      showToast("Hãy nhập đầy đủ thông tin.");
+      return;
+    }
+
+    try {
+      if (mode === "register") {
+        await apiRequest("/api/auth/register", {
+          method: "POST",
+          body: { email, password, full_name: fullName }
+        });
+      }
+
+      const token = await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: { email, password }
+      });
+      auth.token = token.access_token;
+      auth.user = await apiRequest("/api/auth/me", { token: auth.token });
+      moneySync.loaded = false;
+      moneySync.budgetMonth = "";
+      moneySync.error = "";
+      saveAuth();
+      app();
+      showToast(mode === "register" ? "Tạo tài khoản thành công." : "Đăng nhập thành công.");
+    } catch (error) {
+      showToast(error.message || "Không thể kết nối API.");
+    }
+  }
+
+  async function apiRequest(path, options = {}) {
+    const token = options.token === undefined ? auth.token : options.token;
+    let response;
+    try {
+      response = await fetch(`${apiBaseUrl()}${path}`, {
+        method: options.method || "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+    } catch (error) {
+      throw new Error("Không thể kết nối API. Hãy kiểm tra backend đã chạy chưa.");
+    }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(payload.detail, response.status));
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
+  }
+
+  function apiErrorMessage(detail, status) {
+    if (detail === "Email is already registered") return "Email này đã được đăng ký.";
+    if (detail === "Incorrect email or password") return "Email hoặc mật khẩu không đúng.";
+    if (detail === "Budget already exists for this category and month") return "Danh mục này đã có ngân sách trong tháng.";
+    if (detail === "Budget not found") return "Không tìm thấy ngân sách.";
+    if (detail === "Category already exists") return "Danh mục này đã tồn tại.";
+    if (detail === "Category is in use") return "Danh mục đang được dùng trong giao dịch hoặc ngân sách.";
+    if (detail === "Category not found") return "Không tìm thấy danh mục.";
+    if (status === 0) return "Không thể kết nối API.";
+    if (typeof detail === "string") return detail;
+    return "Yêu cầu không thành công.";
+  }
+
+  async function deleteTransaction(id) {
+    try {
+      await apiRequest(`/api/money/transactions/${encodeURIComponent(id)}`, { method: "DELETE" });
+      state.money.transactions = state.money.transactions.filter((transaction) => transaction.id !== id);
+      if (editingId === id) editingId = null;
+      saveAndRender("Đã xóa giao dịch.");
+      await loadMoneyFromApi();
+    } catch (error) {
+      showToast(error.message || "Không thể xóa giao dịch.");
+    }
+  }
+
+  async function createBudget(form) {
+    const formData = new FormData(form);
+    const category = String(formData.get("category") || "");
+    const limit = Number(formData.get("limit_amount") || 0);
+
+    if (!category) {
+      showToast("Hãy chọn danh mục ngân sách.");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/money/budgets", {
+        method: "PUT",
+        body: {
+          category,
+          month: state.money.filters.month || currentMonth(),
+          limit_amount: String(limit)
+        }
+      });
+      form.reset();
+      await loadMoneyFromApi();
+      showToast("Đã thêm ngân sách.");
+    } catch (error) {
+      showToast(error.message || "Không thể thêm ngân sách.");
+    }
+  }
+
+  async function updateBudget(id, updates) {
+    if (!id) {
+      showToast("Ngân sách chưa sẵn sàng để chỉnh sửa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/budgets/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: updates
+      });
+      await loadMoneyFromApi();
+      showToast("Đã cập nhật ngân sách.");
+    } catch (error) {
+      showToast(error.message || "Không thể cập nhật ngân sách.");
+      await loadMoneyFromApi();
+    }
+  }
+
+  async function deleteBudget(id) {
+    if (!id) {
+      showToast("Ngân sách chưa sẵn sàng để xóa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/budgets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await loadMoneyFromApi();
+      showToast("Đã xóa ngân sách.");
+    } catch (error) {
+      showToast(error.message || "Không thể xóa ngân sách.");
+    }
+  }
+
+  async function createCategory(form) {
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    if (!name) {
+      showToast("Hãy nhập tên danh mục.");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/money/categories", {
+        method: "POST",
+        body: { name }
+      });
+      form.reset();
+      await loadMoneyFromApi();
+      showToast("Đã thêm danh mục.");
+    } catch (error) {
+      showToast(error.message || "Không thể thêm danh mục.");
+    }
+  }
+
+  async function updateCategory(id, name) {
+    if (!id) {
+      showToast("Danh mục chưa sẵn sàng để chỉnh sửa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/categories/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: { name }
+      });
+      await loadMoneyFromApi();
+      showToast("Đã cập nhật danh mục.");
+    } catch (error) {
+      showToast(error.message || "Không thể cập nhật danh mục.");
+      await loadMoneyFromApi();
+    }
+  }
+
+  async function deleteCategory(id) {
+    if (!id) {
+      showToast("Danh mục chưa sẵn sàng để xóa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/categories/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await loadMoneyFromApi();
+      showToast("Đã xóa danh mục.");
+    } catch (error) {
+      showToast(error.message || "Không thể xóa danh mục.");
+    }
+  }
+
+  async function resetDemoData() {
+    try {
+      const month = currentMonth();
+      const currentMonthTransactions = state.money.transactions.filter((transaction) => transaction.date.startsWith(month));
+      await Promise.all(
+        currentMonthTransactions.map((transaction) => (
+          apiRequest(`/api/money/transactions/${encodeURIComponent(transaction.id)}`, { method: "DELETE" })
+        ))
+      );
+      await Promise.all(
+        demoTransactions().map((transaction) => (
+          apiRequest("/api/money/transactions", {
+            method: "POST",
+            body: mapTransactionToApi(transaction)
+          })
+        ))
+      );
+      await Promise.all(
+        Object.entries(defaultBudgets).map(([category, limit]) => (
+          apiRequest("/api/money/budgets", {
+            method: "PUT",
+            body: { category, month, limit_amount: String(limit) }
+          })
+        ))
+      );
+      state.money.filters = { month, type: "all", category: "all", search: "" };
+      editingId = null;
+      await loadMoneyFromApi();
+      showToast("Đã khôi phục dữ liệu mẫu.");
+    } catch (error) {
+      showToast(error.message || "Không thể tạo dữ liệu mẫu.");
+    }
   }
 
   function exportData() {

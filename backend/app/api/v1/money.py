@@ -7,12 +7,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.money import Budget, Transaction
+from app.models.money import Budget, MoneyCategory, Transaction
 from app.models.user import User
 from app.schemas.money import (
     BudgetRead,
+    BudgetUpdate,
     BudgetUpsert,
+    CategoryCreate,
+    CategoryRead,
     CategorySpend,
+    CategoryUpdate,
     MoneySummary,
     TransactionCreate,
     TransactionRead,
@@ -21,6 +25,102 @@ from app.schemas.money import (
 
 
 router = APIRouter()
+
+
+@router.get("/categories", response_model=list[CategoryRead])
+def list_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[MoneyCategory]:
+    return list(
+        db.scalars(
+            select(MoneyCategory)
+            .where(MoneyCategory.owner_id == current_user.id)
+            .order_by(MoneyCategory.name.asc())
+        )
+    )
+
+
+@router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
+def create_category(
+    payload: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MoneyCategory:
+    existing = db.scalar(
+        select(MoneyCategory).where(
+            MoneyCategory.owner_id == current_user.id,
+            MoneyCategory.name == payload.name,
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category already exists")
+
+    category = MoneyCategory(owner_id=current_user.id, name=payload.name)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@router.patch("/categories/{category_id}", response_model=CategoryRead)
+def update_category(
+    category_id: int,
+    payload: CategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MoneyCategory:
+    category = get_owned_category(db, current_user.id, category_id)
+    existing = db.scalar(
+        select(MoneyCategory).where(
+            MoneyCategory.owner_id == current_user.id,
+            MoneyCategory.name == payload.name,
+            MoneyCategory.id != category.id,
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category already exists")
+
+    old_name = category.name
+    category.name = payload.name
+    db.query(Transaction).filter(
+        Transaction.owner_id == current_user.id,
+        Transaction.category == old_name,
+    ).update({Transaction.category: payload.name})
+    db.query(Budget).filter(
+        Budget.owner_id == current_user.id,
+        Budget.category == old_name,
+    ).update({Budget.category: payload.name})
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    category = get_owned_category(db, current_user.id, category_id)
+    transaction_count = db.scalar(
+        select(func.count()).select_from(Transaction).where(
+            Transaction.owner_id == current_user.id,
+            Transaction.category == category.name,
+        )
+    )
+    budget_count = db.scalar(
+        select(func.count()).select_from(Budget).where(
+            Budget.owner_id == current_user.id,
+            Budget.category == category.name,
+        )
+    )
+    if transaction_count or budget_count:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category is in use")
+
+    db.delete(category)
+    db.commit()
 
 
 @router.get("/transactions", response_model=list[TransactionRead])
@@ -129,6 +229,49 @@ def upsert_budget(
     return budget_read(db, current_user.id, budget)
 
 
+@router.patch("/budgets/{budget_id}", response_model=BudgetRead)
+def update_budget(
+    budget_id: int,
+    payload: BudgetUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BudgetRead:
+    budget = get_owned_budget(db, current_user.id, budget_id)
+    updates = payload.model_dump(exclude_unset=True)
+
+    category = updates.get("category", budget.category)
+    month = updates.get("month", budget.month)
+    duplicate = db.scalar(
+        select(Budget).where(
+            Budget.owner_id == current_user.id,
+            Budget.category == category,
+            Budget.month == month,
+            Budget.id != budget.id,
+        )
+    )
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Budget already exists for this category and month")
+
+    for field, value in updates.items():
+        setattr(budget, field, value)
+
+    db.add(budget)
+    db.commit()
+    db.refresh(budget)
+    return budget_read(db, current_user.id, budget)
+
+
+@router.delete("/budgets/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_budget(
+    budget_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    budget = get_owned_budget(db, current_user.id, budget_id)
+    db.delete(budget)
+    db.commit()
+
+
 @router.get("/summary", response_model=MoneySummary)
 def summary(
     month: str = Query(pattern=r"^\d{4}-\d{2}$"),
@@ -184,6 +327,22 @@ def get_owned_transaction(db: Session, owner_id: int, transaction_id: int) -> Tr
     if not transaction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return transaction
+
+
+def get_owned_budget(db: Session, owner_id: int, budget_id: int) -> Budget:
+    budget = db.scalar(select(Budget).where(Budget.id == budget_id, Budget.owner_id == owner_id))
+    if not budget:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found")
+    return budget
+
+
+def get_owned_category(db: Session, owner_id: int, category_id: int) -> MoneyCategory:
+    category = db.scalar(
+        select(MoneyCategory).where(MoneyCategory.id == category_id, MoneyCategory.owner_id == owner_id)
+    )
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    return category
 
 
 def budget_reads(db: Session, owner_id: int, month: str) -> list[BudgetRead]:

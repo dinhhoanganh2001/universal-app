@@ -57,10 +57,46 @@ class BudgetUpsert(BaseModel):
         return value.strip()
 
 
+class BudgetUpdate(BaseModel):
+    category: str | None = Field(default=None, min_length=1, max_length=60)
+    month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+    limit_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+
+    @field_validator("category")
+    @classmethod
+    def trim_optional_category(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else value
+
+
 class BudgetRead(BudgetUpsert):
     id: int
     spent_amount: Decimal = Decimal("0.00")
     percent_used: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class CategoryUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+    @field_validator("name")
+    @classmethod
+    def trim_update_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class CategoryRead(BaseModel):
+    id: int
+    name: str
 
     model_config = {"from_attributes": True}
 

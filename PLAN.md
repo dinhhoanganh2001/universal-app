@@ -22,14 +22,15 @@ The app should become a personal operating system where each domain is a module:
 Current frontend slice:
 
 - Track income and expense transactions.
-- Categorize each transaction.
+- Define custom money categories.
+- Categorize each transaction from the user-defined category list.
 - Show balance, income, expense, and savings rate.
 - Show monthly category spending and budget progress.
+- Add, rename, delete, and edit budget checklist rows.
 - Filter by month, type, category, and search text.
 - Edit and delete transactions.
 - Persist data in `localStorage`.
-- Export and import JSON backups.
-- Seed realistic VND demo data.
+- Keep the visible money screen focused on daily tracking, without import/export/demo actions in the main header.
 
 Current backend slice:
 
@@ -37,7 +38,7 @@ Current backend slice:
 - Issue JWT bearer tokens.
 - Store users, transactions, and budgets in a database.
 - Keep money records scoped to the authenticated user.
-- Provide transaction CRUD, budget upsert/list, and monthly summary APIs.
+- Provide category CRUD, transaction CRUD, budget CRUD/upsert/list, and monthly summary APIs.
 
 ## Future Extension Ideas
 
@@ -47,3 +48,4 @@ Current backend slice:
 - Assets module: recurring subscriptions, warranties, documents.
 - Shared account mode: household or small team permissions.
 - Sync backend: API, authentication, and multi-device storage.
+- Data tools: optional import/export and sample-data utilities in a settings or admin area.

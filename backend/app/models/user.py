@@ -17,3 +17,4 @@ class User(Base):
 
     transactions = relationship("Transaction", back_populates="owner", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="owner", cascade="all, delete-orphan")
+    money_categories = relationship("MoneyCategory", back_populates="owner", cascade="all, delete-orphan")

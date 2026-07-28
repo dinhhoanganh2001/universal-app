@@ -27,7 +27,7 @@ The backend lives in `backend/` and provides FastAPI endpoints for authenticatio
 
 ## Current Module
 
-Money Tracking supports transactions, filters, budget limits, category insights, JSON export/import, and VND demo data.
+Money Tracking supports login/register, API-backed transactions, budgets, user-defined categories, filters, category insights, and VND currency display.
 
 ## Extend
 
