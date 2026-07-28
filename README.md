@@ -10,24 +10,29 @@ The frontend app currently uses Vietnamese and VND. Project docs, scripts, and b
 bash start_service.sh
 ```
 
+On first run, the script creates `.env` from `.env.example`.
+
 This starts:
 
 - API: `http://127.0.0.1:8000`
 - UI: `http://127.0.0.1:5173`
 
-Override ports when needed:
+Change ports in the root `.env` file:
 
-```bash
-PORT=8484 FRONTEND_PORT=5174 bash start_service.sh
+```dotenv
+BACKEND_PORT=8484
+FRONTEND_PORT=5174
 ```
+
+Then run `bash start_service.sh` again.
 
 ## Backend
 
-The backend lives in `backend/` and provides FastAPI endpoints for authentication, transactions, budgets, and monthly summaries. See `backend/README.md` for setup and API routes.
+The backend lives in `backend/` and provides FastAPI endpoints for authentication, friends, transactions, budgets, and monthly summaries. See `backend/README.md` for setup and API routes.
 
 ## Current Module
 
-Money Tracking supports login/register, API-backed transactions, budgets, user-defined categories, filters, category insights, and VND currency display.
+Money Tracking supports login/register, API-backed transactions, budgets, user-defined categories, friend budget-progress percentages, filters, category insights, and VND currency display.
 
 ## Extend
 

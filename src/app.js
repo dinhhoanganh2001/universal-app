@@ -62,6 +62,7 @@
     trash: "M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3",
     logout: "M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-5M14 21h5a2 2 0 0 0 2-2",
     user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z",
+    friends: "M17 21a6 6 0 0 0-12 0M11 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4M23 21a5 5 0 0 0-7-4.6M17 3a4 4 0 0 1 0 8",
     chevronLeft: "M15 18l-6-6 6-6",
     chevronRight: "M9 18l6-6-6-6"
   };
@@ -73,6 +74,13 @@
     loading: false,
     budgetMonth: "",
     error: ""
+  };
+  const friendsSync = {
+    loaded: false,
+    loading: false,
+    month: "",
+    error: "",
+    items: []
   };
   let authMode = "login";
   let activeModuleId = "money";
@@ -94,6 +102,14 @@
       icon: "projects",
       enabled: true,
       render: renderCategories
+    },
+    {
+      id: "friends",
+      label: "Bạn bè",
+      description: "Theo dõi phần trăm ngân sách của bạn bè.",
+      icon: "friends",
+      enabled: true,
+      render: renderFriends
     },
     {
       id: "goals",
@@ -245,12 +261,18 @@
   }
 
   function apiBaseUrl() {
-    return localStorage.getItem(API_BASE_STORAGE_KEY) || DEFAULT_API_BASE_URL;
+    return runtimeApiBaseUrl() || localStorage.getItem(API_BASE_STORAGE_KEY) || DEFAULT_API_BASE_URL;
   }
 
   function setApiBaseUrl(value) {
+    if (runtimeApiBaseUrl()) return;
+
     const normalized = String(value || "").trim().replace(/\/+$/, "");
     localStorage.setItem(API_BASE_STORAGE_KEY, normalized || DEFAULT_API_BASE_URL);
+  }
+
+  function runtimeApiBaseUrl() {
+    return String(window.UNIVERSAL_APP_CONFIG?.API_BASE_URL || "").trim().replace(/\/+$/, "");
   }
 
   function currentMonth() {
@@ -366,6 +388,7 @@
     bindRoot(root);
     renderActiveModule();
     ensureMoneyLoaded();
+    ensureFriendsLoaded();
   }
 
   function bindRoot(root) {
@@ -674,6 +697,85 @@
     return counts;
   }
 
+  function renderFriends() {
+    const month = state.money.filters.month || currentMonth();
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Bạn bè</p>
+          <h1>Theo dõi tiến độ ngân sách</h1>
+          <p>Thêm bạn bằng email hoặc ID. Ứng dụng chỉ hiển thị phần trăm ngân sách đã dùng, không hiển thị số tiền.</p>
+        </div>
+        <div class="month-control compact-month">
+          <button type="button" data-action="previous-friends-month" title="Tháng trước">${svgIcon("chevronLeft")}</button>
+          <input type="month" data-filter="month" value="${escapeAttr(month)}">
+          <button type="button" data-action="next-friends-month" title="Tháng sau">${svgIcon("chevronRight")}</button>
+        </div>
+      </section>
+
+      ${friendsSync.loading ? `<div class="sync-banner">Đang tải danh sách bạn bè...</div>` : ""}
+      ${friendsSync.error ? `<div class="sync-banner error">${escapeHtml(friendsSync.error)}</div>` : ""}
+
+      <section class="panel friends-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Danh sách bạn bè</h2>
+            <p>ID của bạn: ${escapeHtml(auth.user?.id || "")}</p>
+          </div>
+        </div>
+        <div class="friends-body">
+          <form class="friend-add" data-form="friend">
+            <div class="field">
+              <label for="friend-identifier">Email hoặc ID</label>
+              <input id="friend-identifier" name="identifier" type="text" maxlength="320" placeholder="friend@example.com hoặc 12" required>
+            </div>
+            <button class="button" type="submit">${svgIcon("plus")}Thêm bạn</button>
+          </form>
+          <div class="friend-list">
+            ${friendsSync.items.length ? friendsSync.items.map(friendRow).join("") : `<div class="empty-state">Chưa có bạn bè nào. Thêm một người để xem phần trăm tiến độ ngân sách.</div>`}
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function friendRow(friend) {
+    const percent = Math.max(0, Number(friend.budget_percent_used || 0));
+    const className = percent >= 100 ? "danger" : percent >= 80 ? "warning" : "";
+    return `
+      <div class="friend-row">
+        <div class="friend-profile">
+          <span class="friend-avatar">${escapeHtml(friendInitials(friend.full_name || friend.email))}</span>
+          <div>
+            <strong>${escapeHtml(friend.full_name || friend.email)}</strong>
+            <small>${escapeHtml(friend.email)} · ID ${escapeHtml(friend.id)}</small>
+          </div>
+        </div>
+        <div class="friend-progress">
+          <div class="row-top">
+            <strong>${percent}%</strong>
+            <span>${Number(friend.budget_count || 0)} ngân sách</span>
+          </div>
+          <div class="progress ${className}" style="--value: ${Math.min(percent, 100)}%">
+            <span></span>
+          </div>
+        </div>
+        <button class="button secondary icon friend-remove" type="button" data-action="delete-friend" data-friend-id="${escapeAttr(friend.id)}" title="Xóa bạn">${svgIcon("trash")}</button>
+      </div>
+    `;
+  }
+
+  function friendInitials(value) {
+    return String(value || "?")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] || "")
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
+  }
+
   function getMoneyViewData() {
     const filters = state.money.filters;
     const selectedMonth = filters.month || currentMonth();
@@ -812,6 +914,12 @@
     await loadMoneyFromApi();
   }
 
+  async function ensureFriendsLoaded() {
+    if (!auth.token || activeModuleId !== "friends" || friendsSync.loading) return;
+    if (friendsSync.loaded && friendsSync.month === state.money.filters.month) return;
+    await loadFriendsFromApi();
+  }
+
   async function loadMoneyFromApi() {
     moneySync.loading = true;
     moneySync.error = "";
@@ -863,6 +971,38 @@
       ))
     );
     return categoryRecords;
+  }
+
+  async function loadFriendsFromApi() {
+    friendsSync.loading = true;
+    friendsSync.error = "";
+    renderActiveModule();
+
+    try {
+      const month = state.money.filters.month || currentMonth();
+      const payload = await apiRequest(`/api/friends?month=${encodeURIComponent(month)}`);
+      friendsSync.items = Array.isArray(payload.friends) ? payload.friends.map(normalizeFriend).filter(Boolean) : [];
+      friendsSync.month = payload.month || month;
+      friendsSync.loaded = true;
+    } catch (error) {
+      friendsSync.error = error.message || "Không thể tải danh sách bạn bè.";
+    } finally {
+      friendsSync.loading = false;
+      if (auth.token && activeModuleId === "friends" && document.querySelector("#main")) {
+        renderActiveModule();
+      }
+    }
+  }
+
+  function normalizeFriend(friend) {
+    if (!friend || typeof friend !== "object") return null;
+    return {
+      id: String(friend.id || ""),
+      email: String(friend.email || ""),
+      full_name: String(friend.full_name || ""),
+      budget_percent_used: Math.max(0, Number(friend.budget_percent_used || 0)),
+      budget_count: Math.max(0, Number(friend.budget_count || 0))
+    };
   }
 
   function transactionTable(transactions, formatter) {
@@ -1054,6 +1194,17 @@
       ensureMoneyLoaded();
     }
 
+    if (action === "previous-friends-month" || action === "next-friends-month") {
+      state.money.filters.month = shiftMonth(
+        state.money.filters.month || currentMonth(),
+        action === "previous-friends-month" ? -1 : 1
+      );
+      friendsSync.loaded = false;
+      saveState();
+      renderActiveModule();
+      ensureFriendsLoaded();
+    }
+
     if (action === "logout") {
       auth.token = "";
       auth.user = null;
@@ -1078,6 +1229,10 @@
 
     if (action === "delete-category") {
       await deleteCategory(actionTarget.dataset.categoryId);
+    }
+
+    if (action === "delete-friend") {
+      await deleteFriend(actionTarget.dataset.friendId);
     }
 
     if (action === "cancel-edit") {
@@ -1113,9 +1268,11 @@
 
     if (event.target.matches("[data-filter]")) {
       state.money.filters[event.target.dataset.filter] = event.target.value;
+      if (event.target.dataset.filter === "month") friendsSync.loaded = false;
       saveState();
       renderActiveModule();
       ensureMoneyLoaded();
+      ensureFriendsLoaded();
     }
 
     if (event.target.matches("[data-budget-limit]")) {
@@ -1160,6 +1317,13 @@
     if (categoryForm) {
       event.preventDefault();
       await createCategory(categoryForm);
+      return;
+    }
+
+    const friendForm = event.target.closest("[data-form='friend']");
+    if (friendForm) {
+      event.preventDefault();
+      await createFriend(friendForm);
       return;
     }
 
@@ -1279,6 +1443,10 @@
     if (detail === "Category already exists") return "Danh mục này đã tồn tại.";
     if (detail === "Category is in use") return "Danh mục đang được dùng trong giao dịch hoặc ngân sách.";
     if (detail === "Category not found") return "Không tìm thấy danh mục.";
+    if (detail === "Friend user not found") return "Không tìm thấy người dùng này.";
+    if (detail === "Cannot add yourself as a friend") return "Bạn không thể thêm chính mình.";
+    if (detail === "Friend already exists") return "Người này đã có trong danh sách bạn bè.";
+    if (detail === "Friend not found") return "Không tìm thấy bạn bè.";
     if (status === 0) return "Không thể kết nối API.";
     if (typeof detail === "string") return detail;
     return "Yêu cầu không thành công.";
@@ -1409,6 +1577,44 @@
       showToast("Đã xóa danh mục.");
     } catch (error) {
       showToast(error.message || "Không thể xóa danh mục.");
+    }
+  }
+
+  async function createFriend(form) {
+    const formData = new FormData(form);
+    const identifier = String(formData.get("identifier") || "").trim();
+    if (!identifier) {
+      showToast("Hãy nhập email hoặc ID.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/friends?month=${encodeURIComponent(state.money.filters.month || currentMonth())}`, {
+        method: "POST",
+        body: { identifier }
+      });
+      form.reset();
+      friendsSync.loaded = false;
+      await loadFriendsFromApi();
+      showToast("Đã thêm bạn bè.");
+    } catch (error) {
+      showToast(error.message || "Không thể thêm bạn bè.");
+    }
+  }
+
+  async function deleteFriend(id) {
+    if (!id) {
+      showToast("Bạn bè chưa sẵn sàng để xóa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/friends/${encodeURIComponent(id)}`, { method: "DELETE" });
+      friendsSync.loaded = false;
+      await loadFriendsFromApi();
+      showToast("Đã xóa bạn bè.");
+    } catch (error) {
+      showToast(error.message || "Không thể xóa bạn bè.");
     }
   }
 

@@ -3,3 +3,4 @@ __pycache__/
 **/.env
 **/.venv/
 backend/universal_app.db
+src/runtime-config.js

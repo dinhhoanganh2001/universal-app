@@ -1,6 +1,6 @@
 # Universal App Backend
 
-FastAPI backend for the Universal App. It currently supports authentication and the Money module, with a structure intended for more modules later.
+FastAPI backend for the Universal App. It currently supports authentication, social friend links, and the Money module, with a structure intended for more modules later.
 
 ## Stack
 
@@ -12,16 +12,25 @@ FastAPI backend for the Universal App. It currently supports authentication and 
 
 ## Setup
 
+For the full local app, configure ports and shared settings in the root `.env` file, then run from the project root:
+
+```bash
+bash start_service.sh
+```
+
+The script starts both API and UI and passes the configured API URL to the frontend.
+
+To run only the backend manually:
+
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+The API will be available at `http://127.0.0.1:8000` by default. Use `start_service.sh` when you want the root `.env` port values to launch both services together.
 
 ## Core Endpoints
 
@@ -29,6 +38,9 @@ The API will be available at `http://127.0.0.1:8000`.
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `GET /api/friends?month=YYYY-MM`
+- `POST /api/friends?month=YYYY-MM`
+- `DELETE /api/friends/{friend_id}`
 - `GET /api/money/categories`
 - `POST /api/money/categories`
 - `PATCH /api/money/categories/{category_id}`

@@ -26,6 +26,7 @@ Current frontend slice:
 - Categorize each transaction from the user-defined category list.
 - Show balance, income, expense, and savings rate.
 - Show monthly category spending and budget progress.
+- Add friends by email or user id and show only their aggregate budget progress percentage.
 - Add, rename, delete, and edit budget checklist rows.
 - Filter by month, type, category, and search text.
 - Edit and delete transactions.
@@ -36,9 +37,10 @@ Current backend slice:
 
 - Register and login users.
 - Issue JWT bearer tokens.
-- Store users, transactions, and budgets in a database.
+- Store users, friend links, transactions, and budgets in a database.
 - Keep money records scoped to the authenticated user.
 - Provide category CRUD, transaction CRUD, budget CRUD/upsert/list, and monthly summary APIs.
+- Provide friend list/add/delete APIs that expose friend budget progress only as percentages.
 
 ## Future Extension Ideas
 

@@ -39,6 +39,90 @@ def main() -> None:
 
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200, me.text
+    demo_user_id = me.json()["id"]
+
+    friend_register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "friend@example.com",
+            "full_name": "Friend User",
+            "password": "strong-password",
+        },
+    )
+    assert friend_register.status_code == 201, friend_register.text
+    friend_user_id = friend_register.json()["id"]
+
+    friend_login = client.post(
+        "/api/auth/login",
+        json={"email": "friend@example.com", "password": "strong-password"},
+    )
+    assert friend_login.status_code == 200, friend_login.text
+    friend_headers = {"Authorization": f"Bearer {friend_login.json()['access_token']}"}
+
+    friend_budget = client.put(
+        "/api/money/budgets",
+        headers=friend_headers,
+        json={"category": "Food", "month": "2026-07", "limit_amount": "100.00"},
+    )
+    assert friend_budget.status_code == 200, friend_budget.text
+    friend_transaction = client.post(
+        "/api/money/transactions",
+        headers=friend_headers,
+        json={
+            "type": "expense",
+            "category": "Food",
+            "note": "Lunch",
+            "amount": "75.00",
+            "occurred_on": "2026-07-28",
+        },
+    )
+    assert friend_transaction.status_code == 201, friend_transaction.text
+
+    id_friend_register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "idfriend@example.com",
+            "full_name": "ID Friend",
+            "password": "strong-password",
+        },
+    )
+    assert id_friend_register.status_code == 201, id_friend_register.text
+    id_friend_id = id_friend_register.json()["id"]
+
+    self_friend = client.post(
+        "/api/friends?month=2026-07",
+        headers=headers,
+        json={"identifier": str(demo_user_id)},
+    )
+    assert self_friend.status_code == 400, self_friend.text
+
+    added_friend = client.post(
+        "/api/friends?month=2026-07",
+        headers=headers,
+        json={"identifier": "friend@example.com"},
+    )
+    assert added_friend.status_code == 201, added_friend.text
+    added_friend_payload = added_friend.json()
+    assert added_friend_payload["id"] == friend_user_id, added_friend_payload
+    assert added_friend_payload["budget_percent_used"] == 75, added_friend_payload
+    assert "spent_amount" not in added_friend_payload, added_friend_payload
+    assert "limit_amount" not in added_friend_payload, added_friend_payload
+
+    added_id_friend = client.post(
+        "/api/friends?month=2026-07",
+        headers=headers,
+        json={"identifier": str(id_friend_id)},
+    )
+    assert added_id_friend.status_code == 201, added_id_friend.text
+
+    friends = client.get("/api/friends?month=2026-07", headers=headers)
+    assert friends.status_code == 200, friends.text
+    friends_payload = friends.json()
+    assert friends_payload["month"] == "2026-07", friends_payload
+    assert len(friends_payload["friends"]) == 2, friends_payload
+
+    deleted_friend = client.delete(f"/api/friends/{id_friend_id}", headers=headers)
+    assert deleted_friend.status_code == 204, deleted_friend.text
 
     category = client.post("/api/money/categories", headers=headers, json={"name": "Food"})
     assert category.status_code == 201, category.text

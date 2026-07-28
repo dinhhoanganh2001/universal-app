@@ -568,6 +568,10 @@ h1 {
   color: var(--accent);
 }
 
+.compact-month {
+  width: min(280px, 100%);
+}
+
 .transaction-list {
   overflow-x: auto;
 }
@@ -761,6 +765,87 @@ td {
   color: var(--muted);
 }
 
+.friends-panel {
+  max-width: 960px;
+}
+
+.friends-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.friend-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.friend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.friend-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.9fr) 38px;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #c2cdc5;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: #f8faf7;
+}
+
+.friend-profile {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.friend-avatar {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  border-radius: var(--radius);
+  background: #17201a;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.friend-profile strong,
+.friend-profile small {
+  display: block;
+}
+
+.friend-profile strong {
+  overflow-wrap: anywhere;
+}
+
+.friend-profile small {
+  color: var(--muted);
+}
+
+.friend-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.friend-progress .row-top strong {
+  font-size: 22px;
+}
+
+.friend-remove {
+  align-self: center;
+}
+
 .row-top {
   display: flex;
   align-items: center;
@@ -919,7 +1004,9 @@ td {
   .budget-add,
   .budget-edit-grid,
   .category-add,
-  .category-definition-row {
+  .category-definition-row,
+  .friend-add,
+  .friend-row {
     grid-template-columns: 1fr;
   }
 
