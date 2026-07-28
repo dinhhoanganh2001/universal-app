@@ -129,3 +129,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added friend links with add-by-email/id, a `Bạn bè` frontend page, and percent-only friend budget progress.
 - Moved local backend/frontend port configuration into root `.env` and generated frontend runtime API config from it.
 - Added `stop_service.sh` and `.service-pids` tracking for stopping services started by `start_service.sh`.
+- Added CORS environment value logging in `start_service.sh` to debug public deployment issues.

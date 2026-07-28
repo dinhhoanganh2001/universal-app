@@ -45,6 +45,8 @@ cd "$BACKEND_DIR"
 
 echo "Starting Universal App API at http://$BACKEND_HOST:$BACKEND_PORT"
 echo "API docs: http://$BACKEND_HOST:$BACKEND_PORT/docs"
+echo "Allowed CORS origins: ${BACKEND_CORS_ORIGINS:-not set}"
+echo "Allowed CORS origin regex: ${BACKEND_CORS_ORIGIN_REGEX:-not set}"
 "$VENV_DIR/bin/uvicorn" app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --reload &
 BACKEND_PID=$!
 
