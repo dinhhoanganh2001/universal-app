@@ -10,6 +10,12 @@ The frontend app currently uses Vietnamese and VND. Project docs, scripts, and b
 bash start_service.sh
 ```
 
+Stop services started by the script:
+
+```bash
+bash stop_service.sh
+```
+
 On first run, the script creates `.env` from `.env.example`.
 
 This starts:
@@ -25,6 +31,19 @@ FRONTEND_PORT=5174
 ```
 
 Then run `bash start_service.sh` again.
+
+For LAN/public access, bind services to all interfaces, but set `API_BASE_URL` to the real IP or domain that browsers can reach:
+
+```dotenv
+BACKEND_HOST=0.0.0.0
+FRONTEND_HOST=0.0.0.0
+BACKEND_PORT=4578
+FRONTEND_PORT=6060
+API_BASE_URL=http://YOUR_SERVER_IP:4578
+BACKEND_CORS_ORIGINS='["http://YOUR_SERVER_IP:6060"]'
+```
+
+Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is assigned directly to the server's network interface. Do not use `http://0.0.0.0:4578` as `API_BASE_URL`; `0.0.0.0` is only for server binding.
 
 ## Backend
 

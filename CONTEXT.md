@@ -30,6 +30,12 @@ This file is the shared working context for contributors and coding agents. Read
 bash start_service.sh
 ```
 
+Stop services started by the script:
+
+```bash
+bash stop_service.sh
+```
+
 Default URLs:
 
 - UI: `http://127.0.0.1:5173`
@@ -45,6 +51,19 @@ FRONTEND_PORT=5174
 
 Then run `bash start_service.sh` again. The script generates ignored `src/runtime-config.js` so the frontend uses the configured API URL.
 
+For LAN/public access, bind to all interfaces but use a reachable URL for browser API calls:
+
+```dotenv
+BACKEND_HOST=0.0.0.0
+FRONTEND_HOST=0.0.0.0
+BACKEND_PORT=4578
+FRONTEND_PORT=6060
+API_BASE_URL=http://YOUR_SERVER_IP:4578
+BACKEND_CORS_ORIGINS='["http://YOUR_SERVER_IP:6060"]'
+```
+
+Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is assigned directly to the server's network interface. Do not set `API_BASE_URL` to `http://0.0.0.0:4578`; `0.0.0.0` is only a bind address.
+
 ## Important Files
 
 - `src/app.js`: frontend state, auth UI, money UI, API calls, and remaining local backup helper code.
@@ -59,11 +78,12 @@ Then run `bash start_service.sh` again. The script generates ignored `src/runtim
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
 - `backend/scripts/cors_smoke_test.py`: CORS preflight smoke test.
 - `start_service.sh`: starts both backend and frontend.
+- `stop_service.sh`: stops backend/frontend processes recorded by `start_service.sh`.
 
 ## Design Decisions
 
 - Use SQLite by default through `DATABASE_URL`; this can move to Postgres later without changing route logic.
-- Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`.
+- Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`, while `API_BASE_URL` and `BACKEND_CORS_ORIGINS` use the real IP/domain reachable by the browser.
 - Keep frontend module labels and money UI in Vietnamese.
 - Keep backend schema field names in English, with stable enum values `income` and `expense`.
 - Store JWT in `localStorage` for now for simple local development.
@@ -108,3 +128,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added an overall total progress bar to the budget progress panel.
 - Added friend links with add-by-email/id, a `Bạn bè` frontend page, and percent-only friend budget progress.
 - Moved local backend/frontend port configuration into root `.env` and generated frontend runtime API config from it.
+- Added `stop_service.sh` and `.service-pids` tracking for stopping services started by `start_service.sh`.

@@ -6,6 +6,7 @@ BACKEND_DIR="$ROOT_DIR/backend"
 VENV_DIR="$BACKEND_DIR/.venv"
 ENV_FILE="$ROOT_DIR/.env"
 RUNTIME_CONFIG_FILE="$ROOT_DIR/src/runtime-config.js"
+PID_FILE="$ROOT_DIR/.service-pids"
 
 if [ ! -f "$ENV_FILE" ] && [ -f "$ROOT_DIR/.env.example" ]; then
   cp "$ROOT_DIR/.env.example" "$ENV_FILE"
@@ -54,11 +55,19 @@ echo "Frontend API URL: $API_BASE_URL"
 python3 -m http.server "$FRONTEND_PORT" --bind "$FRONTEND_HOST" &
 FRONTEND_PID=$!
 
+cat > "$PID_FILE" <<EOF
+BACKEND_PID=$BACKEND_PID
+FRONTEND_PID=$FRONTEND_PID
+BACKEND_PORT=$BACKEND_PORT
+FRONTEND_PORT=$FRONTEND_PORT
+EOF
+
 cleanup() {
   echo
   echo "Stopping Universal App services..."
   kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
   wait "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
+  rm -f "$PID_FILE"
 }
 
 trap cleanup INT TERM EXIT
