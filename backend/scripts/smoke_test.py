@@ -157,10 +157,11 @@ def main() -> None:
     budget = client.put(
         "/api/money/budgets",
         headers=headers,
-        json={"category": "Food", "month": "2026-07", "limit_amount": "500.00"},
+        json={"category": "Food", "month": "2026-07", "limit_amount": "500.00", "color": "#0f766e"},
     )
     assert budget.status_code == 200, budget.text
     assert budget.json()["spent_amount"] == "42.50", budget.text
+    assert budget.json()["color"] == "#0f766e", budget.text
     budget_id = budget.json()["id"]
 
     category_update = client.patch(
@@ -177,11 +178,12 @@ def main() -> None:
     updated_budget = client.patch(
         f"/api/money/budgets/{budget_id}",
         headers=headers,
-        json={"category": "Shopping", "limit_amount": "750.00"},
+        json={"category": "Shopping", "limit_amount": "750.00", "color": "#7c3aed"},
     )
     assert updated_budget.status_code == 200, updated_budget.text
     assert updated_budget.json()["category"] == "Shopping", updated_budget.text
     assert updated_budget.json()["spent_amount"] == "10.00", updated_budget.text
+    assert updated_budget.json()["color"] == "#7c3aed", updated_budget.text
 
     summary = client.get("/api/money/summary?month=2026-07", headers=headers)
     assert summary.status_code == 200, summary.text

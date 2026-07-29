@@ -26,6 +26,7 @@ Current frontend slice:
 - Categorize each transaction from the user-defined category list.
 - Show balance, income, expense, and savings rate.
 - Show monthly category spending and budget progress.
+- Keep budget progress and monthly transactions as separate sidebar navigation items.
 - Add friends by email or user id and show only their aggregate budget progress percentage.
 - Add, rename, delete, and edit budget checklist rows.
 - Filter by month, type, category, and search text.

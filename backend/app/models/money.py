@@ -55,6 +55,7 @@ class Budget(Base):
     category: Mapped[str] = mapped_column(String(60), nullable=False)
     month: Mapped[str] = mapped_column(String(7), index=True, nullable=False)
     limit_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    color: Mapped[str] = mapped_column(String(20), default="#2563eb", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 from app.api.routes import api_router
 from app.core.config import settings
@@ -8,6 +9,7 @@ from app.db.session import Base, engine
 
 def create_app() -> FastAPI:
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema()
 
     app = FastAPI(title=settings.app_name)
     app.add_middleware(
@@ -37,6 +39,19 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     return app
+
+
+def ensure_runtime_schema() -> None:
+    inspector = inspect(engine)
+    if "budgets" not in inspector.get_table_names():
+        return
+
+    budget_columns = {column["name"] for column in inspector.get_columns("budgets")}
+    if "color" not in budget_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE budgets ADD COLUMN color VARCHAR(20) DEFAULT '#2563eb' NOT NULL")
+            )
 
 
 app = create_app()

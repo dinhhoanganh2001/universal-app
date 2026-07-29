@@ -49,8 +49,11 @@
     Other: 2000000
   };
 
+  const budgetColors = ["#2563eb", "#0f766e", "#f59e0b", "#7c3aed", "#0891b2", "#16a34a", "#ea580c"];
+
   const icons = {
     money: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6",
+    transactions: "M4 6h16M4 12h16M4 18h10",
     goals: "M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9ZM12 17a5 5 0 1 0-5-5 5 5 0 0 0 5 5ZM12 13a1 1 0 1 0-1-1 1 1 0 0 0 1 1Z",
     projects: "M4 5h16M4 12h16M4 19h16M8 5v14M16 5v14",
     habits: "M8 12l3 3 5-7M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z",
@@ -85,15 +88,24 @@
   let authMode = "login";
   let activeModuleId = "money";
   let editingId = null;
+  let editingBudgetId = null;
 
   const modules = [
     {
       id: "money",
-      label: "Tiền",
-      description: "Dòng tiền, ngân sách và lịch sử giao dịch.",
+      label: "Ngân sách",
+      description: "Tiến độ ngân sách tháng.",
       icon: "money",
       enabled: true,
       render: renderMoney
+    },
+    {
+      id: "transactions",
+      label: "Giao dịch",
+      description: "Lịch sử thu chi và giao dịch tháng.",
+      icon: "transactions",
+      enabled: true,
+      render: renderTransactions
     },
     {
       id: "categories",
@@ -215,8 +227,25 @@
       month: /^\d{4}-\d{2}$/.test(String(budget.month)) ? String(budget.month) : currentMonth(),
       limit: Math.max(0, Number(budget.limit || budget.limit_amount || 0)),
       spent: Math.max(0, Number(budget.spent || budget.spent_amount || 0)),
-      percent: Math.max(0, Number(budget.percent || budget.percent_used || 0))
+      percent: Math.max(0, Number(budget.percent || budget.percent_used || 0)),
+      color: normalizeBudgetColor(budget.color)
     };
+  }
+
+  function normalizeBudgetColor(value) {
+    const color = String(value || "").trim();
+    const normalized = color.toLowerCase();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return "#2563eb";
+    if (normalized === "#e11d48" || normalized === "#dc2626" || normalized === "#ef4444") return "#2563eb";
+    return color;
+  }
+
+  function budgetColorTint(value) {
+    const color = normalizeBudgetColor(value).slice(1);
+    const red = parseInt(color.slice(0, 2), 16);
+    const green = parseInt(color.slice(2, 4), 16);
+    const blue = parseInt(color.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, 0.14)`;
   }
 
   function normalizeTransaction(transaction) {
@@ -516,29 +545,57 @@
     return `
       <section class="topbar">
         <div>
-          <p class="eyebrow">Theo dõi tiền</p>
-          <h1>Kiểm soát dòng tiền tháng này</h1>
-          <p>Theo dõi tiền vào, tiền ra và những danh mục cần chú ý trước khi kết thúc tháng.</p>
+          <p class="eyebrow">Ngân sách</p>
+          <h1>Tiến độ ngân sách tháng này</h1>
+          <p>Theo dõi hạn mức chi tiêu, phần trăm đã dùng và những danh mục cần chú ý trước khi kết thúc tháng.</p>
         </div>
       </section>
 
       ${moneySync.loading ? `<div class="sync-banner">Đang đồng bộ dữ liệu với backend...</div>` : ""}
       ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
 
+      ${moneyMetrics(data, dollars)}
+      ${renderBudgetTab(data, precise)}
+    `;
+  }
+
+  function renderTransactions() {
+    const data = getMoneyViewData();
+    const dollars = moneyFormatter();
+    const precise = preciseMoneyFormatter();
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Giao dịch</p>
+          <h1>Giao dịch tháng này</h1>
+          <p>Xem, lọc, thêm và chỉnh sửa các khoản thu chi theo tháng.</p>
+        </div>
+      </section>
+
+      ${moneySync.loading ? `<div class="sync-banner">Đang đồng bộ dữ liệu với backend...</div>` : ""}
+      ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
+
+      ${moneyMetrics(data, dollars)}
+      ${renderTransactionTab(data, precise)}
+    `;
+  }
+
+  function moneyMetrics(data, formatter) {
+    return `
       <section class="metric-grid" aria-label="Tổng quan tiền">
         <article class="metric">
           <span>Số dư</span>
-          <strong>${dollars.format(data.balance)}</strong>
+          <strong>${formatter.format(data.balance)}</strong>
           <small>${data.selectedLabel}</small>
         </article>
         <article class="metric">
           <span>Thu nhập</span>
-          <strong>${dollars.format(data.income)}</strong>
+          <strong>${formatter.format(data.income)}</strong>
           <small>${data.incomeCount} giao dịch</small>
         </article>
         <article class="metric">
           <span>Chi tiêu</span>
-          <strong>${dollars.format(data.expenses)}</strong>
+          <strong>${formatter.format(data.expenses)}</strong>
           <small>${data.expenseCount} giao dịch</small>
         </article>
         <article class="metric">
@@ -547,7 +604,32 @@
           <small>${data.balance >= 0 ? "Dòng tiền dương" : "Cần chú ý"}</small>
         </article>
       </section>
+    `;
+  }
 
+  function renderBudgetTab(data, formatter) {
+    return `
+      <section class="budget-dashboard">
+        <article class="panel budget-focus">
+          <div class="panel-header">
+            <div>
+              <h2>Tiến độ ngân sách</h2>
+              <p>Tỷ lệ đã dùng so với hạn mức từng danh mục</p>
+            </div>
+            <div class="month-control compact-month">
+              <button type="button" data-action="previous-month" title="Tháng trước">${svgIcon("chevronLeft")}</button>
+              <input type="month" data-filter="month" value="${escapeAttr(state.money.filters.month)}">
+              <button type="button" data-action="next-month" title="Tháng sau">${svgIcon("chevronRight")}</button>
+            </div>
+          </div>
+          ${budgetList(data.budgetProgress, formatter)}
+        </article>
+      </section>
+    `;
+  }
+
+  function renderTransactionTab(data, formatter) {
+    return `
       <section class="dashboard-grid">
         <div class="left-column">
           <article class="panel">
@@ -587,18 +669,8 @@
               </div>
             </div>
             <div class="transaction-list">
-              ${transactionTable(data.filteredTransactions, precise)}
+              ${transactionTable(data.filteredTransactions, formatter)}
             </div>
-          </article>
-
-          <article class="panel" style="margin-top: 18px;">
-            <div class="panel-header">
-              <div>
-                <h2>Chi tiêu theo danh mục</h2>
-                <p>Phân bổ chi tiêu trong tháng đã chọn</p>
-              </div>
-            </div>
-            ${categoryChart(data.categorySpend)}
           </article>
         </div>
 
@@ -611,16 +683,6 @@
               </div>
             </div>
             ${transactionForm()}
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Tiến độ ngân sách</h2>
-                <p>Hạn mức chi tiêu hằng tháng theo danh mục</p>
-              </div>
-            </div>
-            ${budgetList(data.budgetProgress, precise)}
           </article>
         </aside>
       </section>
@@ -812,7 +874,8 @@
           category: budget.category,
           limit: budget.limit,
           spent,
-          percent: hasSyncedProgress ? budget.percent : budget.limit > 0 ? Math.round((spent / budget.limit) * 100) : 0
+          percent: hasSyncedProgress ? budget.percent : budget.limit > 0 ? Math.round((spent / budget.limit) * 100) : 0,
+          color: normalizeBudgetColor(budget.color)
         };
       })
       .sort((a, b) => b.percent - a.percent);
@@ -903,6 +966,7 @@
       category: budget.category,
       month: budget.month,
       limit_amount: budget.limit_amount,
+      color: budget.color,
       spent_amount: budget.spent_amount,
       percent_used: budget.percent_used
     });
@@ -1118,53 +1182,71 @@
           </div>
         ` : ""}
         ${items.length ? "" : `<div class="empty-state">Chưa có ngân sách nào. Thêm danh mục để bắt đầu theo dõi.</div>`}
-        ${items.map((item) => {
-          const className = item.percent >= 100 ? "danger" : item.percent >= 80 ? "warning" : "";
-          return `
-            <div class="budget-row" data-budget-row="${escapeAttr(item.id)}">
-              <div class="row-top">
-                <strong>${escapeHtml(categoryLabel(item.category))}</strong>
-                <span>${formatter.format(item.spent)} / ${formatter.format(item.limit)}</span>
-              </div>
-              <div class="progress ${className}" style="--value: ${Math.min(item.percent, 100)}%">
-                <span></span>
-              </div>
-              <div class="budget-edit-grid">
-                <div class="field">
-                  <label for="budget-category-${escapeAttr(item.id || slug(item.category))}">Danh mục</label>
-                  <select id="budget-category-${escapeAttr(item.id || slug(item.category))}" data-budget-category="${escapeAttr(item.id)}">
-                    ${categoryOptions().map((category) => option(category, categoryLabel(category), item.category)).join("")}
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="budget-${escapeAttr(item.id || slug(item.category))}">Hạn mức tháng</label>
-                  <input id="budget-${escapeAttr(item.id || slug(item.category))}" data-budget-limit="${escapeAttr(item.id)}" type="number" min="0" step="1000" value="${item.limit}">
-                </div>
-                <button class="button secondary icon budget-remove" type="button" data-action="delete-budget" data-budget-id="${escapeAttr(item.id)}" title="Xóa ngân sách">${svgIcon("trash")}</button>
-              </div>
-            </div>
-          `;
-        }).join("")}
+        ${items.length ? `
+          <div class="category-chart-grid budget-card-grid">
+            ${items.map((item) => budgetCard(item, formatter)).join("")}
+          </div>
+        ` : ""}
       </div>
     `;
   }
 
-  function categoryChart(spend) {
-    const entries = Object.entries(spend).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    if (!entries.length) {
-      return `<div class="empty-state">Danh mục chi tiêu sẽ xuất hiện sau khi bạn thêm giao dịch.</div>`;
-    }
-
-    const max = Math.max(...entries.map((entry) => entry[1]));
+  function budgetCard(item, formatter) {
+    const percent = Math.max(0, Number(item.percent || 0));
+    const className = percent >= 100 ? "danger" : percent >= 80 ? "warning" : "";
+    const color = normalizeBudgetColor(item.color);
+    const isEditing = editingBudgetId === item.id;
     return `
-      <div class="mini-chart" aria-label="Biểu đồ chi tiêu theo danh mục">
-        ${entries.map(([category, total]) => `
-          <div class="bar-wrap" title="${escapeAttr(categoryLabel(category))}: ${preciseMoneyFormatter().format(total)}">
-            <div class="bar" style="--height: ${Math.max(12, Math.round((total / max) * 170))}px"></div>
-            <div class="bar-label">${escapeHtml(categoryLabel(category))}</div>
-          </div>
-        `).join("")}
+      <div class="category-chart-card budget-card" data-budget-row="${escapeAttr(item.id)}" style="--row-accent: ${escapeAttr(color)}; --row-bg: ${escapeAttr(budgetColorTint(color))}" title="${escapeAttr(categoryLabel(item.category))}: ${formatter.format(item.spent)} / ${formatter.format(item.limit)}">
+        <div class="row-top">
+          <strong>${escapeHtml(categoryLabel(item.category))}</strong>
+          <span>${percent}%</span>
+        </div>
+        <div class="progress ${className}" style="--value: ${Math.min(percent, 100)}%">
+          <span></span>
+        </div>
+        <small>${formatter.format(item.spent)} / ${formatter.format(item.limit)}</small>
+        ${isEditing ? budgetEditForm(item, color) : budgetCardActions(item)}
       </div>
+    `;
+  }
+
+  function budgetCardActions(item) {
+    return `
+      <div class="budget-card-actions">
+        <button class="button secondary" type="button" data-action="edit-budget" data-budget-id="${escapeAttr(item.id)}">${svgIcon("edit")}Sửa</button>
+        <button class="button secondary" type="button" data-action="delete-budget" data-budget-id="${escapeAttr(item.id)}">${svgIcon("trash")}Xóa</button>
+      </div>
+    `;
+  }
+
+  function budgetEditForm(item, color) {
+    return `
+      <form class="budget-card-edit" data-form="budget-card" data-budget-id="${escapeAttr(item.id)}">
+        <div class="field">
+          <label>Danh mục</label>
+          <div class="readonly-field">${escapeHtml(categoryLabel(item.category))}</div>
+        </div>
+        <div class="field">
+          <label for="budget-${escapeAttr(item.id || slug(item.category))}">Hạn mức tháng</label>
+          <input id="budget-${escapeAttr(item.id || slug(item.category))}" name="limit_amount" type="number" min="0" step="1000" value="${item.limit}" required>
+        </div>
+        <div class="field wide">
+          <label>Màu</label>
+          <div class="color-picker">
+            ${budgetColors.map((swatch) => `
+              <label class="color-swatch" style="--swatch: ${escapeAttr(swatch)}" title="${escapeAttr(swatch)}">
+                <input type="radio" name="color" value="${escapeAttr(swatch)}" ${swatch.toLowerCase() === color.toLowerCase() ? "checked" : ""}>
+                <span></span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="button secondary" type="button" data-action="cancel-budget-edit">Hủy</button>
+          <button class="button" type="submit">Lưu</button>
+        </div>
+      </form>
     `;
   }
 
@@ -1210,6 +1292,7 @@
       auth.user = null;
       localStorage.removeItem(AUTH_STORAGE_KEY);
       editingId = null;
+      editingBudgetId = null;
       app();
       showToast("Đã đăng xuất.");
     }
@@ -1225,6 +1308,16 @@
 
     if (action === "delete-budget") {
       await deleteBudget(actionTarget.dataset.budgetId);
+    }
+
+    if (action === "edit-budget") {
+      editingBudgetId = actionTarget.dataset.budgetId;
+      renderActiveModule();
+    }
+
+    if (action === "cancel-budget-edit") {
+      editingBudgetId = null;
+      renderActiveModule();
     }
 
     if (action === "delete-category") {
@@ -1275,18 +1368,6 @@
       ensureFriendsLoaded();
     }
 
-    if (event.target.matches("[data-budget-limit]")) {
-      await updateBudget(event.target.dataset.budgetLimit, {
-        limit_amount: String(Number(event.target.value || 0))
-      });
-    }
-
-    if (event.target.matches("[data-budget-category]")) {
-      await updateBudget(event.target.dataset.budgetCategory, {
-        category: event.target.value
-      });
-    }
-
     if (event.target.matches("[data-category-name]")) {
       const nextName = event.target.value.trim();
       const previousName = event.target.dataset.originalName;
@@ -1310,6 +1391,13 @@
     if (budgetForm) {
       event.preventDefault();
       await createBudget(budgetForm);
+      return;
+    }
+
+    const budgetCardForm = event.target.closest("[data-form='budget-card']");
+    if (budgetCardForm) {
+      event.preventDefault();
+      await saveBudgetCard(budgetCardForm);
       return;
     }
 
@@ -1480,7 +1568,8 @@
         body: {
           category,
           month: state.money.filters.month || currentMonth(),
-          limit_amount: String(limit)
+          limit_amount: String(limit),
+          color: budgetColors[0]
         }
       });
       form.reset();
@@ -1502,6 +1591,7 @@
         method: "PATCH",
         body: updates
       });
+      editingBudgetId = null;
       await loadMoneyFromApi();
       showToast("Đã cập nhật ngân sách.");
     } catch (error) {
@@ -1518,11 +1608,24 @@
 
     try {
       await apiRequest(`/api/money/budgets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (editingBudgetId === id) editingBudgetId = null;
       await loadMoneyFromApi();
       showToast("Đã xóa ngân sách.");
     } catch (error) {
       showToast(error.message || "Không thể xóa ngân sách.");
     }
+  }
+
+  async function saveBudgetCard(form) {
+    const id = form.dataset.budgetId;
+    const formData = new FormData(form);
+    const limit = Number(formData.get("limit_amount") || 0);
+    const color = normalizeBudgetColor(formData.get("color"));
+
+    await updateBudget(id, {
+      limit_amount: String(limit),
+      color
+    });
   }
 
   async function createCategory(form) {
@@ -1636,15 +1739,16 @@
         ))
       );
       await Promise.all(
-        Object.entries(defaultBudgets).map(([category, limit]) => (
+        Object.entries(defaultBudgets).map(([category, limit], index) => (
           apiRequest("/api/money/budgets", {
             method: "PUT",
-            body: { category, month, limit_amount: String(limit) }
+            body: { category, month, limit_amount: String(limit), color: budgetColors[index % budgetColors.length] }
           })
         ))
       );
       state.money.filters = { month, type: "all", category: "all", search: "" };
       editingId = null;
+      editingBudgetId = null;
       await loadMoneyFromApi();
       showToast("Đã khôi phục dữ liệu mẫu.");
     } catch (error) {

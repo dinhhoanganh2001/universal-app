@@ -220,6 +220,7 @@ def upsert_budget(
     )
     if budget:
         budget.limit_amount = payload.limit_amount
+        budget.color = payload.color
     else:
         budget = Budget(owner_id=current_user.id, **payload.model_dump())
         db.add(budget)
@@ -374,6 +375,7 @@ def budget_read(db: Session, owner_id: int, budget: Budget) -> BudgetRead:
         category=budget.category,
         month=budget.month,
         limit_amount=budget.limit_amount,
+        color=budget.color,
         spent_amount=spent_amount,
         percent_used=percent_used,
     )

@@ -16,13 +16,17 @@ This file is the shared working context for contributors and coding agents. Read
 - Money category APIs exist for user-defined category names.
 - The frontend login/register screen talks to the backend auth endpoints.
 - After login, the frontend money tracker syncs transactions and budgets with the backend.
+- The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
 - Users can manage money categories on the `Danh mục` page.
 - Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
-- Budget progress includes an overall monthly total progress bar above category rows.
-- Budget progress rows use a bordered, lightly tinted treatment with an accent strip for easier scanning.
+- Budget progress includes an overall monthly total progress bar above category cards.
+- Budget progress uses two-column chart cards per category with percentage used and spent/limit values.
+- Budget cards show read-only category names; card edit mode changes only monthly amount and background color.
+- Red is reserved for over-budget/danger states and is not available in user-selected budget card colors.
 - The UI uses a more colorful visual system with varied card accents, richer sidebar/auth surfaces, colorful progress bars, and chart colors.
+- `index.html` includes version query strings on frontend assets to avoid stale browser cache after deploys.
 - The visible money screen no longer exposes import/export/demo-data buttons.
 
 ## How To Run
@@ -133,3 +137,9 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added CORS environment value logging in `start_service.sh` to debug public deployment issues.
 - Added backend CORS preflight logging in `backend/app/main.py` to print Origin, requested method, and requested headers for OPTIONS requests.
 - Refreshed the frontend visual style with broader accent colors and more colorful dashboard/list/chart treatments.
+- Split `Ngân sách` and `Giao dịch` into separate sidebar navigation items, with `Ngân sách` as the default first page.
+- Added frontend asset cache-busting query strings to `index.html` so deployed UI changes are visible after refresh.
+- Reworked the category spending area away from a long single-row chart and then merged it into the budget-progress card view.
+- Merged `Chi tiêu theo danh mục` into `Tiến độ ngân sách`; budget progress now uses the chart-card box UI and keeps per-card edit controls.
+- Added persistent budget card background colors and changed budget card editing so users can edit only amount/color, not category name.
+- Removed red from selectable budget card colors; legacy red card values render with the default blue.
