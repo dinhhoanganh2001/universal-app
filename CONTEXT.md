@@ -22,7 +22,7 @@ This file is the shared working context for contributors and coding agents. Read
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
 - Users can manage money categories on the `Danh mục` page.
 - The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add dropdown shows the full defined category list and blocks duplicate current-month budgets with a toast.
-- Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage.
+- Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage; the page also shows the current user as a local, non-removable comparison row.
 - Users can manage profile settings on the `Hồ sơ` page, including display name, avatar URL, currency preference, and password.
 - The current money UI is cost/budget focused: income categories, income transaction controls, and income summary cards are hidden/disabled.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
@@ -160,3 +160,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Changed friend adding into a request flow with incoming accept/reject and outgoing cancel actions; existing direct friendship rows migrate as accepted.
 - Removed income from the active money workflow: defaults/demo data exclude income categories, transaction forms submit only expenses, API transaction lists/summaries are expense-only, and old local income rows are ignored.
 - Extended default login sessions to 30 days.
+- Added the current user to the `Bạn bè` list as a non-removable comparison row using the same aggregate budget percent format as friends.

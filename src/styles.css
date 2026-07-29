@@ -983,6 +983,11 @@ tbody tr:hover {
   background: var(--row-bg, #f8faf7);
 }
 
+.friend-self-row {
+  --row-accent: var(--violet);
+  --row-bg: #f5f3ff;
+}
+
 .friend-profile {
   min-width: 0;
   display: flex;
@@ -1026,6 +1031,20 @@ tbody tr:hover {
 
 .friend-remove {
   align-self: center;
+}
+
+.friend-self-badge {
+  min-height: 32px;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  border: 1px solid rgba(124, 58, 237, 0.24);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--violet);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .friend-request-section {

@@ -940,6 +940,7 @@
 
   function renderFriends() {
     const month = state.money.filters.month || currentMonth();
+    const friendItems = [selfFriendComparison(getMoneyViewData()), ...friendsSync.items];
     return `
       <section class="topbar">
         <div>
@@ -975,23 +976,37 @@
           ${friendRequestSection("Lời mời đến", friendsSync.incoming, "incoming")}
           ${friendRequestSection("Đã gửi", friendsSync.outgoing, "outgoing")}
           <div class="friend-list">
-            ${friendsSync.items.length ? friendsSync.items.map(friendRow).join("") : `<div class="empty-state">Chưa có bạn bè nào. Thêm một người để xem phần trăm tiến độ ngân sách.</div>`}
+            ${friendItems.map(friendRow).join("")}
           </div>
         </div>
       </section>
     `;
   }
 
+  function selfFriendComparison(data) {
+    const totalSpent = data.budgetProgress.reduce((sum, budget) => sum + Number(budget.spent || 0), 0);
+    const totalLimit = data.budgetProgress.reduce((sum, budget) => sum + Number(budget.limit || 0), 0);
+    return {
+      id: auth.user?.id || "",
+      email: auth.user?.email || "",
+      full_name: auth.user?.full_name || auth.user?.email || "Bạn",
+      avatar_url: auth.user?.avatar_url || "",
+      budget_percent_used: totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0,
+      budget_count: data.budgetProgress.length,
+      is_self: true
+    };
+  }
+
   function friendRow(friend) {
     const percent = Math.max(0, Number(friend.budget_percent_used || 0));
     const className = percent >= 100 ? "danger" : percent >= 80 ? "warning" : "";
     return `
-      <div class="friend-row">
+      <div class="friend-row ${friend.is_self ? "friend-self-row" : ""}">
         <div class="friend-profile">
           ${avatarMarkup(friend, "friend-avatar")}
           <div>
             <strong>${escapeHtml(friend.full_name || friend.email)}</strong>
-            <small>${escapeHtml(friend.email)} · ID ${escapeHtml(friend.id)}</small>
+            <small>${friend.is_self ? "Bạn" : escapeHtml(friend.email)} · ID ${escapeHtml(friend.id)}</small>
           </div>
         </div>
         <div class="friend-progress">
@@ -1003,7 +1018,9 @@
             <span></span>
           </div>
         </div>
-        <button class="button secondary icon friend-remove" type="button" data-action="delete-friend" data-friend-id="${escapeAttr(friend.id)}" title="Xóa bạn">${svgIcon("trash")}</button>
+        ${friend.is_self
+          ? `<span class="friend-self-badge">Bạn</span>`
+          : `<button class="button secondary icon friend-remove" type="button" data-action="delete-friend" data-friend-id="${escapeAttr(friend.id)}" title="Xóa bạn">${svgIcon("trash")}</button>`}
       </div>
     `;
   }
