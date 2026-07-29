@@ -17,6 +17,7 @@ bash stop_service.sh
 ```
 
 On first run, the script creates `.env` from `.env.example`.
+The start script launches both services in the background with `nohup`, writes `.service-pids`, and stores logs in `.service-logs/`.
 
 This starts:
 

@@ -18,7 +18,7 @@ For the full local app, configure ports and shared settings in the root `.env` f
 bash start_service.sh
 ```
 
-The script starts both API and UI and passes the configured API URL to the frontend.
+The script starts both API and UI in the background with `nohup`, passes the configured API URL to the frontend, records `.service-pids`, and writes logs under `.service-logs/`.
 
 To run only the backend manually:
 
@@ -38,8 +38,12 @@ The API will be available at `http://127.0.0.1:8000` by default. Use `start_serv
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me`
+- `PATCH /api/auth/password`
 - `GET /api/friends?month=YYYY-MM`
-- `POST /api/friends?month=YYYY-MM`
+- `POST /api/friends`
+- `POST /api/friends/requests/{request_id}/accept?month=YYYY-MM`
+- `DELETE /api/friends/requests/{request_id}`
 - `DELETE /api/friends/{friend_id}`
 - `GET /api/money/categories`
 - `POST /api/money/categories`

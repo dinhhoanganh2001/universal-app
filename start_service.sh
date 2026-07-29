@@ -7,6 +7,9 @@ VENV_DIR="$BACKEND_DIR/.venv"
 ENV_FILE="$ROOT_DIR/.env"
 RUNTIME_CONFIG_FILE="$ROOT_DIR/src/runtime-config.js"
 PID_FILE="$ROOT_DIR/.service-pids"
+LOG_DIR="$ROOT_DIR/.service-logs"
+BACKEND_LOG="$LOG_DIR/backend.log"
+FRONTEND_LOG="$LOG_DIR/frontend.log"
 
 if [ ! -f "$ENV_FILE" ] && [ -f "$ROOT_DIR/.env.example" ]; then
   cp "$ROOT_DIR/.env.example" "$ENV_FILE"
@@ -33,6 +36,8 @@ if [ ! -d "$VENV_DIR" ]; then
   python3 -m venv "$VENV_DIR"
 fi
 
+mkdir -p "$LOG_DIR"
+
 cat > "$RUNTIME_CONFIG_FILE" <<EOF
 window.UNIVERSAL_APP_CONFIG = {
   API_BASE_URL: "$API_BASE_URL"
@@ -47,14 +52,14 @@ echo "Starting Universal App API at http://$BACKEND_HOST:$BACKEND_PORT"
 echo "API docs: http://$BACKEND_HOST:$BACKEND_PORT/docs"
 echo "Allowed CORS origins: ${BACKEND_CORS_ORIGINS:-not set}"
 echo "Allowed CORS origin regex: ${BACKEND_CORS_ORIGIN_REGEX:-not set}"
-"$VENV_DIR/bin/uvicorn" app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --reload &
+nohup "$VENV_DIR/bin/uvicorn" app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --reload > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 
 cd "$ROOT_DIR"
 
 echo "Starting Universal App UI at http://$FRONTEND_HOST:$FRONTEND_PORT"
 echo "Frontend API URL: $API_BASE_URL"
-python3 -m http.server "$FRONTEND_PORT" --bind "$FRONTEND_HOST" &
+nohup python3 -m http.server "$FRONTEND_PORT" --bind "$FRONTEND_HOST" > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 
 cat > "$PID_FILE" <<EOF
@@ -62,15 +67,13 @@ BACKEND_PID=$BACKEND_PID
 FRONTEND_PID=$FRONTEND_PID
 BACKEND_PORT=$BACKEND_PORT
 FRONTEND_PORT=$FRONTEND_PORT
+BACKEND_LOG=$BACKEND_LOG
+FRONTEND_LOG=$FRONTEND_LOG
 EOF
 
-cleanup() {
-  echo
-  echo "Stopping Universal App services..."
-  kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
-  wait "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
-  rm -f "$PID_FILE"
-}
-
-trap cleanup INT TERM EXIT
-wait "$BACKEND_PID" "$FRONTEND_PID"
+echo "Universal App services started in the background."
+echo "Backend PID: $BACKEND_PID"
+echo "Frontend PID: $FRONTEND_PID"
+echo "Backend log: $BACKEND_LOG"
+echo "Frontend log: $FRONTEND_LOG"
+echo "Stop services with: bash stop_service.sh"

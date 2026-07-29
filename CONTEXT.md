@@ -60,6 +60,7 @@ FRONTEND_PORT=5174
 ```
 
 Then run `bash start_service.sh` again. The script generates ignored `src/runtime-config.js` so the frontend uses the configured API URL.
+`start_service.sh` launches backend/frontend with `nohup`, returns after writing `.service-pids`, and writes ignored logs under `.service-logs/`.
 
 For LAN/public access, bind to all interfaces but use a reachable URL for browser API calls:
 
@@ -87,7 +88,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - `backend/app/api/v1/money.py`: transaction, budget, and summary endpoints.
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
 - `backend/scripts/cors_smoke_test.py`: CORS preflight smoke test.
-- `start_service.sh`: starts both backend and frontend.
+- `start_service.sh`: starts both backend and frontend in the background with `nohup`.
 - `stop_service.sh`: stops backend/frontend processes recorded by `start_service.sh`.
 
 ## Design Decisions
@@ -140,6 +141,7 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added friend links with add-by-email/id, a `Bạn bè` frontend page, and percent-only friend budget progress.
 - Moved local backend/frontend port configuration into root `.env` and generated frontend runtime API config from it.
 - Added `stop_service.sh` and `.service-pids` tracking for stopping services started by `start_service.sh`.
+- Changed `start_service.sh` to launch backend/frontend with `nohup`, write logs to `.service-logs/`, and return immediately; tightened `stop_service.sh` so it stops detached PIDs reliably.
 - Added CORS environment value logging in `start_service.sh` to debug public deployment issues.
 - Added backend CORS preflight logging in `backend/app/main.py` to print Origin, requested method, and requested headers for OPTIONS requests.
 - Refreshed the frontend visual style with broader accent colors and more colorful dashboard/list/chart treatments.

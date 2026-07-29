@@ -5,4 +5,5 @@ __pycache__/
 backend/universal_app.db
 src/runtime-config.js
 .service-pids
+.service-logs/
 *.txt
