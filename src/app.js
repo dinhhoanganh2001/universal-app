@@ -4,21 +4,7 @@
   const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
   const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
-  const defaultCategories = [
-    "Salary",
-    "Freelance",
-    "Food",
-    "Housing",
-    "Transport",
-    "Utilities",
-    "Health",
-    "Entertainment",
-    "Shopping",
-    "Savings",
-    "Other"
-  ];
-
-  const categoryLabels = {
+  const legacyCategoryLabels = {
     Salary: "Lương",
     Freelance: "Làm thêm",
     Food: "Ăn uống",
@@ -32,6 +18,9 @@
     Other: "Khác"
   };
 
+  const defaultCategories = Object.values(legacyCategoryLabels);
+  const categoryLabels = legacyCategoryLabels;
+
   const typeLabels = {
     all: "Tất cả",
     income: "Thu nhập",
@@ -39,14 +28,14 @@
   };
 
   const defaultBudgets = {
-    Food: 6000000,
-    Housing: 12000000,
-    Transport: 2500000,
-    Utilities: 3000000,
-    Health: 2500000,
-    Entertainment: 3000000,
-    Shopping: 4000000,
-    Other: 2000000
+    "Ăn uống": 6000000,
+    "Nhà ở": 12000000,
+    "Di chuyển": 2500000,
+    "Hóa đơn": 3000000,
+    "Sức khỏe": 2500000,
+    "Giải trí": 3000000,
+    "Mua sắm": 4000000,
+    "Khác": 2000000
   };
 
   const budgetColors = ["#2563eb", "#0f766e", "#f59e0b", "#7c3aed", "#0891b2", "#16a34a", "#ea580c"];
@@ -177,12 +166,13 @@
     const money = input.money || {};
     const importedBudgets = money.budgets && typeof money.budgets === "object" ? money.budgets : {};
     const budgets = Object.entries({ ...defaultBudgets, ...importedBudgets }).reduce((safeBudgets, [category, limit]) => {
-      safeBudgets[String(category)] = Math.max(0, Number(limit) || 0);
+      safeBudgets[localizeCategoryName(category)] = Math.max(0, Number(limit) || 0);
       return safeBudgets;
     }, {});
     const filters = money.filters && typeof money.filters === "object" ? money.filters : {};
     const month = /^\d{4}-\d{2}$/.test(String(filters.month)) ? String(filters.month) : currentMonth();
     const type = ["all", "income", "expense"].includes(filters.type) ? filters.type : "all";
+    const categoryFilter = String(filters.category || "all");
 
     return {
       money: {
@@ -194,7 +184,7 @@
         filters: {
           month,
           type,
-          category: String(filters.category || "all").slice(0, 60),
+          category: categoryFilter === "all" ? "all" : localizeCategoryName(categoryFilter).slice(0, 60),
           search: String(filters.search || "").slice(0, 100)
         }
       }
@@ -203,7 +193,12 @@
 
   function normalizeCategories(values) {
     const source = Array.isArray(values) && values.length ? values : defaultCategories;
-    return [...new Set(source.map((category) => String(category || "").trim()).filter(Boolean))].slice(0, 80);
+    return [...new Set(source.map(localizeCategoryName).filter(Boolean))].slice(0, 80);
+  }
+
+  function localizeCategoryName(category) {
+    const name = String(category || "").trim().slice(0, 60);
+    return legacyCategoryLabels[name] || name;
   }
 
   function normalizeCategoryRecord(category) {
@@ -214,7 +209,7 @@
 
     return {
       id: category.id === undefined || category.id === null ? "" : String(category.id),
-      name
+      name: localizeCategoryName(name)
     };
   }
 
@@ -223,7 +218,7 @@
 
     return {
       id: budget.id === undefined || budget.id === null ? "" : String(budget.id),
-      category: String(budget.category || "Other").slice(0, 60),
+      category: localizeCategoryName(budget.category || "Khác").slice(0, 60),
       month: /^\d{4}-\d{2}$/.test(String(budget.month)) ? String(budget.month) : currentMonth(),
       limit: Math.max(0, Number(budget.limit || budget.limit_amount || 0)),
       spent: Math.max(0, Number(budget.spent || budget.spent_amount || 0)),
@@ -257,7 +252,7 @@
 
     return {
       id: String(transaction.id || newId()),
-      category: String(transaction.category || "Other").slice(0, 60),
+      category: localizeCategoryName(transaction.category || "Khác").slice(0, 60),
       note: String(transaction.note || "Giao dịch đã nhập").slice(0, 140),
       amount,
       type,
@@ -317,16 +312,16 @@
   function demoTransactions() {
     const month = currentMonth();
     return [
-      createTransaction("Salary", "Lương chính", 45000000, "income", `${month}-01`),
-      createTransaction("Freelance", "Dự án ngoài giờ", 7000000, "income", `${month}-07`),
-      createTransaction("Housing", "Tiền nhà", 12000000, "expense", `${month}-02`),
-      createTransaction("Food", "Đi chợ", 950000, "expense", `${month}-04`),
-      createTransaction("Transport", "Thẻ xe buýt và taxi", 650000, "expense", `${month}-06`),
-      createTransaction("Utilities", "Điện, nước và internet", 2100000, "expense", `${month}-09`),
-      createTransaction("Entertainment", "Ăn tối với bạn bè", 780000, "expense", `${month}-12`),
-      createTransaction("Savings", "Quỹ khẩn cấp", 8000000, "expense", `${month}-15`),
-      createTransaction("Health", "Nhà thuốc", 320000, "expense", `${month}-16`),
-      createTransaction("Shopping", "Túi đi làm", 1500000, "expense", `${month}-18`)
+      createTransaction("Lương", "Lương chính", 45000000, "income", `${month}-01`),
+      createTransaction("Làm thêm", "Dự án ngoài giờ", 7000000, "income", `${month}-07`),
+      createTransaction("Nhà ở", "Tiền nhà", 12000000, "expense", `${month}-02`),
+      createTransaction("Ăn uống", "Đi chợ", 950000, "expense", `${month}-04`),
+      createTransaction("Di chuyển", "Thẻ xe buýt và taxi", 650000, "expense", `${month}-06`),
+      createTransaction("Hóa đơn", "Điện, nước và internet", 2100000, "expense", `${month}-09`),
+      createTransaction("Giải trí", "Ăn tối với bạn bè", 780000, "expense", `${month}-12`),
+      createTransaction("Tiết kiệm", "Quỹ khẩn cấp", 8000000, "expense", `${month}-15`),
+      createTransaction("Sức khỏe", "Nhà thuốc", 320000, "expense", `${month}-16`),
+      createTransaction("Mua sắm", "Túi đi làm", 1500000, "expense", `${month}-18`)
     ];
   }
 
@@ -690,7 +685,7 @@
   }
 
   function renderCategories() {
-    const items = categoryOptions();
+    const items = definedCategoryOptions();
     const usedCounts = categoryUsageCounts();
 
     return `
@@ -721,7 +716,7 @@
             <button class="button" type="submit">${svgIcon("plus")}Thêm danh mục</button>
           </form>
           <div class="category-definition-list">
-            ${state.money.categories.length ? state.money.categories.map((category) => categoryDefinitionRow(category, usedCounts)).join("") : `<div class="empty-state">Chưa có danh mục nào.</div>`}
+            ${items.length ? items.map((category) => categoryDefinitionRow(category, usedCounts)).join("") : `<div class="empty-state">Chưa có danh mục nào.</div>`}
           </div>
         </div>
       </section>
@@ -917,15 +912,27 @@
     return normalizeCategories([...state.money.categories, ...used]);
   }
 
+  function definedCategoryOptions() {
+    return normalizeCategories(state.money.categories);
+  }
+
+  function transactionCategoryOptions(editing) {
+    const categories = definedCategoryOptions();
+    if (editing?.category && !categories.includes(editing.category)) {
+      return normalizeCategories([editing.category, ...categories]);
+    }
+    return categories;
+  }
+
   function categoryRecordFromApi(category) {
     return {
       id: String(category.id),
-      name: String(category.name || "").slice(0, 60)
+      name: localizeCategoryName(category.name)
     };
   }
 
   function categoryLabel(category) {
-    return categoryLabels[category] || category;
+    return categoryLabels[category] || localizeCategoryName(category);
   }
 
   function transactionTypeLabel(type) {
@@ -955,9 +962,17 @@
 
   function budgetsFromApi(budgets) {
     return budgets.reduce((result, budget) => {
-      result[budget.category] = Number(budget.limit_amount || 0);
+      result[localizeCategoryName(budget.category)] = Number(budget.limit_amount || 0);
       return result;
     }, {});
+  }
+
+  function budgetExistsForCurrentMonth(category) {
+    const month = state.money.filters.month || currentMonth();
+    return Object.prototype.hasOwnProperty.call(state.money.budgets, category)
+      || state.money.budgetRecords.some((budget) => (
+        budget.category === category && budget.month === month
+      ));
   }
 
   function budgetRecordFromApi(budget) {
@@ -991,10 +1006,10 @@
 
     try {
       const month = state.money.filters.month || currentMonth();
-      const [transactions, summary, categories] = await Promise.all([
+      const categories = await loadCategoriesFromApi();
+      const [transactions, summary] = await Promise.all([
         apiRequest("/api/money/transactions"),
-        apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`),
-        loadCategoriesFromApi()
+        apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`)
       ]);
       const budgets = summary.budgets || [];
       state.money.transactions = transactions.map(mapTransactionFromApi);
@@ -1024,7 +1039,7 @@
 
   async function loadCategoriesFromApi() {
     let categoryRecords = await apiRequest("/api/money/categories");
-    if (categoryRecords.length) return categoryRecords;
+    if (categoryRecords.length) return migrateLegacyCategoryRecords(categoryRecords);
 
     categoryRecords = await Promise.all(
       defaultCategories.map((name) => (
@@ -1035,6 +1050,33 @@
       ))
     );
     return categoryRecords;
+  }
+
+  async function migrateLegacyCategoryRecords(categoryRecords) {
+    const names = new Set(categoryRecords.map((category) => String(category.name || "")));
+    const migrated = [];
+
+    for (const category of categoryRecords) {
+      const oldName = String(category.name || "");
+      const nextName = legacyCategoryLabels[oldName];
+      if (nextName && nextName !== oldName && !names.has(nextName)) {
+        try {
+          const updated = await apiRequest(`/api/money/categories/${encodeURIComponent(category.id)}`, {
+            method: "PATCH",
+            body: { name: nextName }
+          });
+          names.delete(oldName);
+          names.add(nextName);
+          migrated.push(updated);
+          continue;
+        } catch (error) {
+          console.warn("Unable to migrate category name.", error);
+        }
+      }
+      migrated.push(category);
+    }
+
+    return migrated;
   }
 
   async function loadFriendsFromApi() {
@@ -1109,6 +1151,7 @@
 
   function transactionForm() {
     const editing = state.money.transactions.find((transaction) => transaction.id === editingId);
+    const categories = transactionCategoryOptions(editing);
     return `
       <form class="form-grid" data-form="transaction">
         <input type="hidden" name="id" value="${escapeAttr(editing ? editing.id : "")}">
@@ -1126,7 +1169,7 @@
         <div class="field">
           <label for="transaction-category">Danh mục</label>
           <select id="transaction-category" name="category" required>
-            ${categoryOptions().map((category) => option(category, categoryLabel(category), editing?.category || "Food")).join("")}
+            ${categories.map((category) => option(category, categoryLabel(category), editing?.category || categories[0] || "Ăn uống")).join("")}
           </select>
         </div>
         <div class="field">
@@ -1146,10 +1189,9 @@
   }
 
   function budgetList(items, formatter) {
-    const usedCategories = new Set(items.map((item) => item.category));
-    const addOptions = categoryOptions()
-      .filter((category) => !usedCategories.has(category))
+    const addOptions = definedCategoryOptions()
       .map((category) => option(category, categoryLabel(category), ""));
+    const hasAddOptions = addOptions.length > 0;
     const totalSpent = items.reduce((sum, item) => sum + Number(item.spent || 0), 0);
     const totalLimit = items.reduce((sum, item) => sum + Number(item.limit || 0), 0);
     const totalPercent = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
@@ -1159,15 +1201,15 @@
         <form class="budget-add" data-form="budget">
           <div class="field">
             <label for="budget-new-category">Danh mục</label>
-            <select id="budget-new-category" name="category" required>
-              ${addOptions.length ? addOptions.join("") : categoryOptions().map((category) => option(category, categoryLabel(category), "")).join("")}
+            <select id="budget-new-category" name="category" required ${hasAddOptions ? "" : "disabled"}>
+              ${hasAddOptions ? addOptions.join("") : `<option value="">Chưa có danh mục nào</option>`}
             </select>
           </div>
           <div class="field">
             <label for="budget-new-limit">Hạn mức</label>
             <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="1000" placeholder="0" required>
           </div>
-          <button class="button secondary" type="submit">${svgIcon("plus")}Thêm</button>
+          <button class="button secondary" type="submit" ${hasAddOptions ? "" : "disabled"}>${svgIcon("plus")}Thêm</button>
         </form>
         ${items.length ? `
           <div class="budget-total">
@@ -1559,6 +1601,11 @@
 
     if (!category) {
       showToast("Hãy chọn danh mục ngân sách.");
+      return;
+    }
+
+    if (budgetExistsForCurrentMonth(category)) {
+      showToast("Đã có ngân sách cho hạn mục này, xem ở dưới");
       return;
     }
 

@@ -8,6 +8,7 @@ This file is the shared working context for contributors and coding agents. Read
 - The frontend is static HTML/CSS/JavaScript: `index.html`, `src/styles.css`, `src/app.js`.
 - Local service ports are configured through the root `.env` file copied from `.env.example`.
 - The app language is Vietnamese and the displayed currency is VND.
+- Default money category values are Vietnamese in the frontend. Known legacy English default names are translated/migrated for older local and backend data.
 - Project documentation, scripts, backend internals, and collaboration notes should stay in English unless explicitly requested.
 - The backend is a FastAPI app under `backend/`.
 - Authentication exists with register/login/me endpoints and JWT bearer tokens.
@@ -19,6 +20,7 @@ This file is the shared working context for contributors and coding agents. Read
 - The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
 - Users can manage money categories on the `Danh mục` page.
+- The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add dropdown shows the full defined category list and blocks duplicate current-month budgets with a toast.
 - Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
 - Budget progress includes an overall monthly total progress bar above category cards.
@@ -143,3 +145,6 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Merged `Chi tiêu theo danh mục` into `Tiến độ ngân sách`; budget progress now uses the chart-card box UI and keeps per-card edit controls.
 - Added persistent budget card background colors and changed budget card editing so users can edit only amount/color, not category name.
 - Removed red from selectable budget card colors; legacy red card values render with the default blue.
+- Changed frontend money category defaults, demo data, local-state normalization, and backend category-load migration so known default categories use Vietnamese names instead of legacy English values.
+- Synced budget and transaction add dropdowns to the `Danh mục` page category list instead of mixing in historical transaction/budget categories.
+- Changed the budget-add dropdown to show the full defined category list and show `Đã có ngân sách cho hạn mục này, xem ở dưới` when a selected category already has a budget this month.
