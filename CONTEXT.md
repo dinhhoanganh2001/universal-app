@@ -22,6 +22,7 @@ This file is the shared working context for contributors and coding agents. Read
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
 - Budget progress includes an overall monthly total progress bar above category rows.
 - Budget progress rows use a bordered, lightly tinted treatment with an accent strip for easier scanning.
+- The UI uses a more colorful visual system with varied card accents, richer sidebar/auth surfaces, colorful progress bars, and chart colors.
 - The visible money screen no longer exposes import/export/demo-data buttons.
 
 ## How To Run
@@ -131,3 +132,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added `stop_service.sh` and `.service-pids` tracking for stopping services started by `start_service.sh`.
 - Added CORS environment value logging in `start_service.sh` to debug public deployment issues.
 - Added backend CORS preflight logging in `backend/app/main.py` to print Origin, requested method, and requested headers for OPTIONS requests.
+- Refreshed the frontend visual style with broader accent colors and more colorful dashboard/list/chart treatments.
