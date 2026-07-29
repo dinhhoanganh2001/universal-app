@@ -43,7 +43,31 @@ def create_app() -> FastAPI:
 
 def ensure_runtime_schema() -> None:
     inspector = inspect(engine)
-    if "budgets" not in inspector.get_table_names():
+    table_names = inspector.get_table_names()
+    if "users" in table_names:
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        with engine.begin() as connection:
+            if "avatar_url" not in user_columns:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) DEFAULT '' NOT NULL")
+                )
+            if "currency" not in user_columns:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN currency VARCHAR(3) DEFAULT 'VND' NOT NULL")
+                )
+
+    if "friendships" in table_names:
+        friendship_columns = {column["name"] for column in inspector.get_columns("friendships")}
+        with engine.begin() as connection:
+            if "requested_by_id" not in friendship_columns:
+                connection.execute(text("ALTER TABLE friendships ADD COLUMN requested_by_id INTEGER"))
+                connection.execute(text("UPDATE friendships SET requested_by_id = owner_id WHERE requested_by_id IS NULL"))
+            if "status" not in friendship_columns:
+                connection.execute(
+                    text("ALTER TABLE friendships ADD COLUMN status VARCHAR(16) DEFAULT 'accepted' NOT NULL")
+                )
+
+    if "budgets" not in table_names:
         return
 
     budget_columns = {column["name"] for column in inspector.get_columns("budgets")}

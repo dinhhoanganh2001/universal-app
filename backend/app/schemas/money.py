@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
-TransactionType = Literal["income", "expense"]
+TransactionType = Literal["expense"]
 
 
 class TransactionBase(BaseModel):
@@ -110,9 +110,6 @@ class CategorySpend(BaseModel):
 
 class MoneySummary(BaseModel):
     month: str
-    income: Decimal
     expenses: Decimal
-    balance: Decimal
-    savings_rate: int
     category_spend: list[CategorySpend]
     budgets: list[BudgetRead]

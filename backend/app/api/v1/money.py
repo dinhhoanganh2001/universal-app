@@ -126,13 +126,13 @@ def delete_category(
 @router.get("/transactions", response_model=list[TransactionRead])
 def list_transactions(
     month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
-    type: str | None = Query(default=None, pattern=r"^(income|expense)$"),
+    type: str | None = Query(default=None, pattern=r"^expense$"),
     category: str | None = Query(default=None, min_length=1, max_length=60),
     search: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Transaction]:
-    conditions = [Transaction.owner_id == current_user.id]
+    conditions = [Transaction.owner_id == current_user.id, Transaction.type == "expense"]
     if month:
         start, end = month_bounds(month)
         conditions.append(Transaction.occurred_on >= start)
@@ -160,6 +160,9 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Transaction:
+    if payload.type != "expense":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Income transactions are disabled")
+
     transaction = Transaction(owner_id=current_user.id, **payload.model_dump())
     db.add(transaction)
     db.commit()
@@ -176,6 +179,9 @@ def update_transaction(
 ) -> Transaction:
     transaction = get_owned_transaction(db, current_user.id, transaction_id)
     updates = payload.model_dump(exclude_unset=True)
+    if updates.get("type") and updates["type"] != "expense":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Income transactions are disabled")
+
     for field, value in updates.items():
         setattr(transaction, field, value)
 
@@ -280,20 +286,15 @@ def summary(
     current_user: User = Depends(get_current_user),
 ) -> MoneySummary:
     start, end = month_bounds(month)
-    rows = db.execute(
-        select(Transaction.type, func.coalesce(func.sum(Transaction.amount), 0))
-        .where(
+    total_expenses = db.scalar(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.owner_id == current_user.id,
+            Transaction.type == "expense",
             Transaction.occurred_on >= start,
             Transaction.occurred_on < end,
         )
-        .group_by(Transaction.type)
-    ).all()
-    totals = {row[0]: Decimal(row[1]) for row in rows}
-    income = totals.get("income", Decimal("0.00"))
-    expenses = totals.get("expense", Decimal("0.00"))
-    balance = income - expenses
-    savings_rate = round((balance / income) * 100) if income > 0 else 0
+    )
+    expenses = Decimal(total_expenses or 0)
 
     category_rows = db.execute(
         select(Transaction.category, func.coalesce(func.sum(Transaction.amount), 0))
@@ -309,10 +310,7 @@ def summary(
 
     return MoneySummary(
         month=month,
-        income=income,
         expenses=expenses,
-        balance=balance,
-        savings_rate=savings_rate,
         category_spend=[
             CategorySpend(category=row[0], spent_amount=Decimal(row[1]))
             for row in category_rows

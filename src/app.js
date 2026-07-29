@@ -18,13 +18,18 @@
     Other: "Khác"
   };
 
-  const defaultCategories = Object.values(legacyCategoryLabels);
+  const defaultCategories = Object.values(legacyCategoryLabels)
+    .filter((name) => !["Lương", "Làm thêm", "Tiết kiệm"].includes(name));
   const categoryLabels = legacyCategoryLabels;
 
   const typeLabels = {
-    all: "Tất cả",
-    income: "Thu nhập",
     expense: "Chi tiêu"
+  };
+
+  const currencyOptions = {
+    VND: { label: "VND", locale: "vi-VN", currency: "VND", fractionDigits: 0, step: "1000" },
+    USD: { label: "Dollar", locale: "en-US", currency: "USD", fractionDigits: 2, step: "0.01" },
+    EUR: { label: "Euro", locale: "de-DE", currency: "EUR", fractionDigits: 2, step: "0.01" }
   };
 
   const defaultBudgets = {
@@ -38,11 +43,27 @@
     "Khác": 2000000
   };
 
-  const budgetColors = ["#2563eb", "#0f766e", "#f59e0b", "#7c3aed", "#0891b2", "#16a34a", "#ea580c"];
+  const budgetColors = [
+    "#2563eb",
+    "#0f766e",
+    "#f59e0b",
+    "#7c3aed",
+    "#0891b2",
+    "#16a34a",
+    "#4f46e5",
+    "#0284c7",
+    "#059669",
+    "#65a30d",
+    "#14b8a6",
+    "#64748b"
+  ];
+  const defaultBudgetColor = budgetColors[0];
+  const dangerBudgetColor = "#e11d48";
 
   const icons = {
     money: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6",
     transactions: "M4 6h16M4 12h16M4 18h10",
+    profile: "M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM20 21a8 8 0 1 0-16 0",
     goals: "M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9ZM12 17a5 5 0 1 0-5-5 5 5 0 0 0 5 5ZM12 13a1 1 0 1 0-1-1 1 1 0 0 0 1 1Z",
     projects: "M4 5h16M4 12h16M4 19h16M8 5v14M16 5v14",
     habits: "M8 12l3 3 5-7M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z",
@@ -72,7 +93,9 @@
     loading: false,
     month: "",
     error: "",
-    items: []
+    items: [],
+    incoming: [],
+    outgoing: []
   };
   let authMode = "login";
   let activeModuleId = "money";
@@ -111,6 +134,14 @@
       icon: "friends",
       enabled: true,
       render: renderFriends
+    },
+    {
+      id: "profile",
+      label: "Hồ sơ",
+      description: "Cập nhật tài khoản, ảnh đại diện, tiền tệ và mật khẩu.",
+      icon: "profile",
+      enabled: true,
+      render: renderProfile
     },
     {
       id: "goals",
@@ -171,7 +202,6 @@
     }, {});
     const filters = money.filters && typeof money.filters === "object" ? money.filters : {};
     const month = /^\d{4}-\d{2}$/.test(String(filters.month)) ? String(filters.month) : currentMonth();
-    const type = ["all", "income", "expense"].includes(filters.type) ? filters.type : "all";
     const categoryFilter = String(filters.category || "all");
 
     return {
@@ -183,7 +213,7 @@
         budgets,
         filters: {
           month,
-          type,
+          type: "expense",
           category: categoryFilter === "all" ? "all" : localizeCategoryName(categoryFilter).slice(0, 60),
           search: String(filters.search || "").slice(0, 100)
         }
@@ -230,8 +260,8 @@
   function normalizeBudgetColor(value) {
     const color = String(value || "").trim();
     const normalized = color.toLowerCase();
-    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return "#2563eb";
-    if (normalized === "#e11d48" || normalized === "#dc2626" || normalized === "#ef4444") return "#2563eb";
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return defaultBudgetColor;
+    if (isRedAdjacentBudgetColor(normalized)) return defaultBudgetColor;
     return color;
   }
 
@@ -243,10 +273,30 @@
     return `rgba(${red}, ${green}, ${blue}, 0.14)`;
   }
 
+  function isRedAdjacentBudgetColor(color) {
+    if (["#e11d48", "#dc2626", "#ef4444", "#f43f5e", "#fb7185", "#ea580c"].includes(color)) return true;
+
+    const red = parseInt(color.slice(1, 3), 16) / 255;
+    const green = parseInt(color.slice(3, 5), 16) / 255;
+    const blue = parseInt(color.slice(5, 7), 16) / 255;
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    if (delta === 0) return false;
+
+    let hue = 0;
+    if (max === red) hue = 60 * (((green - blue) / delta) % 6);
+    if (max === green) hue = 60 * ((blue - red) / delta + 2);
+    if (max === blue) hue = 60 * ((red - green) / delta + 4);
+    hue = (hue + 360) % 360;
+
+    return hue <= 28 || hue >= 340;
+  }
+
   function normalizeTransaction(transaction) {
     if (!transaction || typeof transaction !== "object") return null;
+    if (transaction.type === "income") return null;
 
-    const type = transaction.type === "income" ? "income" : "expense";
     const amount = Math.max(0, Number(transaction.amount) || 0);
     const date = /^\d{4}-\d{2}-\d{2}$/.test(String(transaction.date)) ? String(transaction.date) : new Date().toISOString().slice(0, 10);
 
@@ -255,7 +305,7 @@
       category: localizeCategoryName(transaction.category || "Khác").slice(0, 60),
       note: String(transaction.note || "Giao dịch đã nhập").slice(0, 140),
       amount,
-      type,
+      type: "expense",
       date
     };
   }
@@ -272,7 +322,7 @@
       const parsed = JSON.parse(stored);
       return {
         token: String(parsed.token || ""),
-        user: parsed.user && typeof parsed.user === "object" ? parsed.user : null
+        user: normalizeUser(parsed.user)
       };
     } catch (error) {
       console.warn("Unable to parse saved auth state.", error);
@@ -282,6 +332,19 @@
 
   function saveAuth() {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  }
+
+  function normalizeUser(user) {
+    if (!user || typeof user !== "object") return null;
+    const currency = currencyOptions[user.currency] ? user.currency : "VND";
+    return {
+      id: user.id === undefined || user.id === null ? "" : String(user.id),
+      email: String(user.email || ""),
+      full_name: String(user.full_name || "").trim(),
+      avatar_url: String(user.avatar_url || "").trim(),
+      currency,
+      created_at: String(user.created_at || "")
+    };
   }
 
   function apiBaseUrl() {
@@ -312,26 +375,23 @@
   function demoTransactions() {
     const month = currentMonth();
     return [
-      createTransaction("Lương", "Lương chính", 45000000, "income", `${month}-01`),
-      createTransaction("Làm thêm", "Dự án ngoài giờ", 7000000, "income", `${month}-07`),
-      createTransaction("Nhà ở", "Tiền nhà", 12000000, "expense", `${month}-02`),
-      createTransaction("Ăn uống", "Đi chợ", 950000, "expense", `${month}-04`),
-      createTransaction("Di chuyển", "Thẻ xe buýt và taxi", 650000, "expense", `${month}-06`),
-      createTransaction("Hóa đơn", "Điện, nước và internet", 2100000, "expense", `${month}-09`),
-      createTransaction("Giải trí", "Ăn tối với bạn bè", 780000, "expense", `${month}-12`),
-      createTransaction("Tiết kiệm", "Quỹ khẩn cấp", 8000000, "expense", `${month}-15`),
-      createTransaction("Sức khỏe", "Nhà thuốc", 320000, "expense", `${month}-16`),
-      createTransaction("Mua sắm", "Túi đi làm", 1500000, "expense", `${month}-18`)
+      createTransaction("Nhà ở", "Tiền nhà", 12000000, `${month}-02`),
+      createTransaction("Ăn uống", "Đi chợ", 950000, `${month}-04`),
+      createTransaction("Di chuyển", "Thẻ xe buýt và taxi", 650000, `${month}-06`),
+      createTransaction("Hóa đơn", "Điện, nước và internet", 2100000, `${month}-09`),
+      createTransaction("Giải trí", "Ăn tối với bạn bè", 780000, `${month}-12`),
+      createTransaction("Sức khỏe", "Nhà thuốc", 320000, `${month}-16`),
+      createTransaction("Mua sắm", "Túi đi làm", 1500000, `${month}-18`)
     ];
   }
 
-  function createTransaction(category, note, amount, type, date) {
+  function createTransaction(category, note, amount, date) {
     return {
       id: newId(),
       category,
       note,
       amount: Number(amount),
-      type,
+      type: "expense",
       date
     };
   }
@@ -341,19 +401,29 @@
   }
 
   function moneyFormatter() {
-    return new Intl.NumberFormat("vi-VN", {
+    const currency = activeCurrency();
+    return new Intl.NumberFormat(currency.locale, {
       style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0
+      currency: currency.currency,
+      maximumFractionDigits: currency.fractionDigits
     });
   }
 
   function preciseMoneyFormatter() {
-    return new Intl.NumberFormat("vi-VN", {
+    const currency = activeCurrency();
+    return new Intl.NumberFormat(currency.locale, {
       style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0
+      currency: currency.currency,
+      maximumFractionDigits: currency.fractionDigits
     });
+  }
+
+  function activeCurrency() {
+    return currencyOptions[auth.user?.currency] || currencyOptions.VND;
+  }
+
+  function amountStep() {
+    return activeCurrency().step;
   }
 
   function formatDate(value) {
@@ -364,6 +434,14 @@
     }).format(new Date(`${value}T12:00:00`));
   }
 
+  function formatDateTime(value) {
+    if (!value) return "";
+    return new Intl.DateTimeFormat("vi-VN", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
+  }
+
   function svgIcon(name) {
     return `
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -371,6 +449,15 @@
         <path d="${icons[name] || icons.money}"></path>
       </svg>
     `;
+  }
+
+  function avatarMarkup(user, className = "profile-avatar-small") {
+    const name = user?.full_name || user?.email || "Tài khoản";
+    const avatarUrl = String(user?.avatar_url || "").trim();
+    if (avatarUrl) {
+      return `<span class="${className}"><img src="${escapeAttr(avatarUrl)}" alt="${escapeAttr(name)}"></span>`;
+    }
+    return `<span class="${className}">${escapeHtml(friendInitials(name))}</span>`;
   }
 
   function app() {
@@ -397,7 +484,7 @@
         </nav>
         <div class="sidebar-footer">
           <div class="account-chip">
-            <span class="module-icon">${svgIcon("user")}</span>
+            ${avatarMarkup(auth.user)}
             <span>${escapeHtml(auth.user?.full_name || auth.user?.email || "Tài khoản")}</span>
           </div>
           <button class="module-button logout-button" data-action="logout">
@@ -441,23 +528,23 @@
 
             <div class="showcase-copy">
               <p class="eyebrow">Tài chính cá nhân</p>
-              <h1>Nắm rõ tiền vào và tiền ra.</h1>
-              <p>Một không gian gọn gàng để theo dõi giao dịch, ngân sách và số dư bằng VND.</p>
+              <h1>Nắm rõ chi phí mỗi tháng.</h1>
+              <p>Một không gian gọn gàng để đặt ngân sách, theo dõi khoản chi và giữ hạn mức trong tầm kiểm soát.</p>
             </div>
 
             <div class="auth-preview" aria-hidden="true">
               <div class="preview-top">
-                <span>Số dư hiện tại</span>
-                <strong>28.320.000 ₫</strong>
+                <span>Chi tiêu tháng này</span>
+                <strong>23.680.000 ₫</strong>
               </div>
               <div class="preview-metrics">
                 <div>
-                  <span>Thu nhập</span>
-                  <strong>52.000.000 ₫</strong>
+                  <span>Ngân sách</span>
+                  <strong>33.000.000 ₫</strong>
                 </div>
                 <div>
-                  <span>Chi tiêu</span>
-                  <strong>23.680.000 ₫</strong>
+                  <span>Còn lại</span>
+                  <strong>9.320.000 ₫</strong>
                 </div>
               </div>
               <div class="preview-progress">
@@ -484,7 +571,7 @@
             <div class="auth-copy">
               <p class="eyebrow">${isRegister ? "Tạo tài khoản" : "Đăng nhập"}</p>
               <h1>${isRegister ? "Tạo tài khoản mới" : "Đăng nhập tài khoản"}</h1>
-              <p>${isRegister ? "Dùng email và mật khẩu để bắt đầu lưu dữ liệu trên backend." : "Tiếp tục quản lý giao dịch và ngân sách của bạn."}</p>
+              <p>${isRegister ? "Dùng email và mật khẩu để bắt đầu lưu dữ liệu trên backend." : "Tiếp tục quản lý chi phí và ngân sách của bạn."}</p>
             </div>
             <form class="auth-form" data-form="${isRegister ? "register" : "login"}">
               ${isRegister ? `
@@ -563,7 +650,7 @@
         <div>
           <p class="eyebrow">Giao dịch</p>
           <h1>Giao dịch tháng này</h1>
-          <p>Xem, lọc, thêm và chỉnh sửa các khoản thu chi theo tháng.</p>
+          <p>Xem, lọc, thêm và chỉnh sửa các khoản chi theo tháng.</p>
         </div>
       </section>
 
@@ -579,24 +666,24 @@
     return `
       <section class="metric-grid" aria-label="Tổng quan tiền">
         <article class="metric">
-          <span>Số dư</span>
-          <strong>${formatter.format(data.balance)}</strong>
+          <span>Chi tiêu</span>
+          <strong>${formatter.format(data.expenses)}</strong>
           <small>${data.selectedLabel}</small>
         </article>
         <article class="metric">
-          <span>Thu nhập</span>
-          <strong>${formatter.format(data.income)}</strong>
-          <small>${data.incomeCount} giao dịch</small>
+          <span>Giao dịch</span>
+          <strong>${data.expenseCount}</strong>
+          <small>Khoản chi trong tháng</small>
         </article>
         <article class="metric">
-          <span>Chi tiêu</span>
-          <strong>${formatter.format(data.expenses)}</strong>
-          <small>${data.expenseCount} giao dịch</small>
+          <span>Còn lại</span>
+          <strong>${formatter.format(data.remainingBudget)}</strong>
+          <small>So với tổng ngân sách</small>
         </article>
         <article class="metric">
-          <span>Tỷ lệ tiết kiệm</span>
-          <strong>${data.savingsRate}%</strong>
-          <small>${data.balance >= 0 ? "Dòng tiền dương" : "Cần chú ý"}</small>
+          <span>Vượt ngân sách</span>
+          <strong>${data.overBudgetCount}</strong>
+          <small>Danh mục từ 100% trở lên</small>
         </article>
       </section>
     `;
@@ -642,14 +729,6 @@
                   <input id="filter-month" type="month" data-filter="month" value="${escapeAttr(state.money.filters.month)}">
                   <button type="button" data-action="next-month" title="Tháng sau">${svgIcon("chevronRight")}</button>
                 </div>
-              </div>
-              <div class="field">
-                <label for="filter-type">Loại</label>
-                <select id="filter-type" data-filter="type">
-                  ${option("all", typeLabels.all, state.money.filters.type)}
-                  ${option("income", typeLabels.income, state.money.filters.type)}
-                  ${option("expense", typeLabels.expense, state.money.filters.type)}
-                </select>
               </div>
               <div class="field">
                 <label for="filter-category">Danh mục</label>
@@ -754,6 +833,111 @@
     return counts;
   }
 
+  function renderProfile() {
+    const user = auth.user || {};
+    const createdLabel = user.created_at
+      ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(new Date(user.created_at))
+      : "Chưa rõ";
+
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Hồ sơ</p>
+          <h1>Cài đặt tài khoản</h1>
+          <p>Cập nhật tên hiển thị, ảnh đại diện, tiền tệ và mật khẩu đăng nhập.</p>
+        </div>
+      </section>
+
+      <section class="profile-layout">
+        <article class="panel profile-summary">
+          <div class="profile-hero">
+            ${avatarMarkup(user, "profile-avatar-large")}
+            <div>
+              <h2>${escapeHtml(user.full_name || user.email || "Tài khoản")}</h2>
+              <p>${escapeHtml(user.email || "")}</p>
+            </div>
+          </div>
+          <div class="profile-facts">
+            <div>
+              <span>ID tài khoản</span>
+              <strong>${escapeHtml(user.id || "")}</strong>
+            </div>
+            <div>
+              <span>Tiền tệ</span>
+              <strong>${escapeHtml(activeCurrency().label)}</strong>
+            </div>
+            <div>
+              <span>Ngày tạo</span>
+              <strong>${escapeHtml(createdLabel)}</strong>
+            </div>
+            <div>
+              <span>Phiên đăng nhập</span>
+              <strong>30 ngày</strong>
+            </div>
+          </div>
+          <div class="profile-api">
+            <span>API URL</span>
+            <strong>${escapeHtml(apiBaseUrl())}</strong>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Thông tin cá nhân</h2>
+              <p>Tên và ảnh đại diện sẽ hiển thị trong tài khoản và lời mời kết bạn.</p>
+            </div>
+          </div>
+          <form class="profile-form" data-form="profile">
+            <div class="field">
+              <label for="profile-name">Họ tên</label>
+              <input id="profile-name" name="full_name" type="text" maxlength="120" value="${escapeAttr(user.full_name || "")}" required>
+            </div>
+            <div class="field">
+              <label for="profile-avatar">Ảnh đại diện URL</label>
+              <input id="profile-avatar" name="avatar_url" type="url" maxlength="500" value="${escapeAttr(user.avatar_url || "")}" placeholder="https://...">
+            </div>
+            <div class="field">
+              <label for="profile-currency">Tiền tệ</label>
+              <select id="profile-currency" name="currency">
+                ${Object.entries(currencyOptions).map(([value, config]) => option(value, config.label, user.currency || "VND")).join("")}
+              </select>
+            </div>
+            <div class="form-actions">
+              <button class="button" type="submit">Lưu hồ sơ</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Đổi mật khẩu</h2>
+              <p>Mật khẩu mới cần tối thiểu 8 ký tự.</p>
+            </div>
+          </div>
+          <form class="profile-form" data-form="password">
+            <div class="field">
+              <label for="current-password">Mật khẩu hiện tại</label>
+              <input id="current-password" name="current_password" type="password" autocomplete="current-password" minlength="8" required>
+            </div>
+            <div class="field">
+              <label for="new-password">Mật khẩu mới</label>
+              <input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div class="field">
+              <label for="confirm-password">Nhập lại mật khẩu mới</label>
+              <input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div class="form-actions">
+              <button class="button" type="submit">Đổi mật khẩu</button>
+            </div>
+          </form>
+        </article>
+      </section>
+    `;
+  }
+
   function renderFriends() {
     const month = state.money.filters.month || currentMonth();
     return `
@@ -761,7 +945,7 @@
         <div>
           <p class="eyebrow">Bạn bè</p>
           <h1>Theo dõi tiến độ ngân sách</h1>
-          <p>Thêm bạn bằng email hoặc ID. Ứng dụng chỉ hiển thị phần trăm ngân sách đã dùng, không hiển thị số tiền.</p>
+          <p>Gửi lời mời bằng email hoặc ID. Bạn bè cần chấp nhận trước khi hai bên nhìn thấy phần trăm tiến độ ngân sách.</p>
         </div>
         <div class="month-control compact-month">
           <button type="button" data-action="previous-friends-month" title="Tháng trước">${svgIcon("chevronLeft")}</button>
@@ -776,7 +960,7 @@
       <section class="panel friends-panel">
         <div class="panel-header">
           <div>
-            <h2>Danh sách bạn bè</h2>
+            <h2>Lời mời và bạn bè</h2>
             <p>ID của bạn: ${escapeHtml(auth.user?.id || "")}</p>
           </div>
         </div>
@@ -786,8 +970,10 @@
               <label for="friend-identifier">Email hoặc ID</label>
               <input id="friend-identifier" name="identifier" type="text" maxlength="320" placeholder="friend@example.com hoặc 12" required>
             </div>
-            <button class="button" type="submit">${svgIcon("plus")}Thêm bạn</button>
+            <button class="button" type="submit">${svgIcon("plus")}Gửi lời mời</button>
           </form>
+          ${friendRequestSection("Lời mời đến", friendsSync.incoming, "incoming")}
+          ${friendRequestSection("Đã gửi", friendsSync.outgoing, "outgoing")}
           <div class="friend-list">
             ${friendsSync.items.length ? friendsSync.items.map(friendRow).join("") : `<div class="empty-state">Chưa có bạn bè nào. Thêm một người để xem phần trăm tiến độ ngân sách.</div>`}
           </div>
@@ -802,7 +988,7 @@
     return `
       <div class="friend-row">
         <div class="friend-profile">
-          <span class="friend-avatar">${escapeHtml(friendInitials(friend.full_name || friend.email))}</span>
+          ${avatarMarkup(friend, "friend-avatar")}
           <div>
             <strong>${escapeHtml(friend.full_name || friend.email)}</strong>
             <small>${escapeHtml(friend.email)} · ID ${escapeHtml(friend.id)}</small>
@@ -822,6 +1008,44 @@
     `;
   }
 
+  function friendRequestSection(title, requests, direction) {
+    if (!requests.length) return "";
+    return `
+      <div class="friend-request-section">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="friend-list">
+          ${requests.map((request) => friendRequestRow(request, direction)).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function friendRequestRow(request, direction) {
+    return `
+      <div class="friend-row friend-request-row">
+        <div class="friend-profile">
+          ${avatarMarkup(request, "friend-avatar")}
+          <div>
+            <strong>${escapeHtml(request.full_name || request.email)}</strong>
+            <small>${escapeHtml(request.email)} · ID ${escapeHtml(request.user_id)}</small>
+          </div>
+        </div>
+        <div class="friend-request-status">
+          <strong>${direction === "incoming" ? "Đang chờ bạn chấp nhận" : "Đang chờ phản hồi"}</strong>
+          <span>${formatDateTime(request.created_at)}</span>
+        </div>
+        <div class="friend-request-actions">
+          ${direction === "incoming" ? `
+            <button class="button secondary" type="button" data-action="accept-friend-request" data-request-id="${escapeAttr(request.request_id)}">Chấp nhận</button>
+            <button class="button secondary" type="button" data-action="reject-friend-request" data-request-id="${escapeAttr(request.request_id)}">Từ chối</button>
+          ` : `
+            <button class="button secondary" type="button" data-action="cancel-friend-request" data-request-id="${escapeAttr(request.request_id)}">Hủy lời mời</button>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
   function friendInitials(value) {
     return String(value || "?")
       .trim()
@@ -836,9 +1060,10 @@
   function getMoneyViewData() {
     const filters = state.money.filters;
     const selectedMonth = filters.month || currentMonth();
-    const selectedMonthTransactions = state.money.transactions.filter((transaction) => transaction.date.startsWith(selectedMonth));
+    const selectedMonthTransactions = state.money.transactions
+      .filter((transaction) => transaction.type === "expense")
+      .filter((transaction) => transaction.date.startsWith(selectedMonth));
     const filteredTransactions = selectedMonthTransactions
-      .filter((transaction) => filters.type === "all" || transaction.type === filters.type)
       .filter((transaction) => filters.category === "all" || transaction.category === filters.category)
       .filter((transaction) => {
         const query = filters.search.trim().toLowerCase();
@@ -846,14 +1071,8 @@
       })
       .sort((a, b) => b.date.localeCompare(a.date));
 
-    const income = selectedMonthTransactions
-      .filter((transaction) => transaction.type === "income")
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
     const expenses = selectedMonthTransactions
-      .filter((transaction) => transaction.type === "expense")
       .reduce((sum, transaction) => sum + transaction.amount, 0);
-    const balance = income - expenses;
-    const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
     const categorySpend = categoryTotals(selectedMonthTransactions);
     const budgetSource = auth.token && moneySync.loaded
       ? state.money.budgetRecords
@@ -874,17 +1093,18 @@
         };
       })
       .sort((a, b) => b.percent - a.percent);
+    const totalLimit = budgetProgress.reduce((sum, budget) => sum + Number(budget.limit || 0), 0);
+    const remainingBudget = totalLimit - expenses;
+    const overBudgetCount = budgetProgress.filter((budget) => Number(budget.percent || 0) >= 100).length;
 
     return {
       selectedLabel: new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${selectedMonth}-01T12:00:00`)),
       selectedMonthTransactions,
       filteredTransactions,
-      income,
       expenses,
-      balance,
-      savingsRate,
-      incomeCount: selectedMonthTransactions.filter((transaction) => transaction.type === "income").length,
-      expenseCount: selectedMonthTransactions.filter((transaction) => transaction.type === "expense").length,
+      remainingBudget,
+      overBudgetCount,
+      expenseCount: selectedMonthTransactions.length,
       categorySpend,
       budgetProgress
     };
@@ -892,7 +1112,6 @@
 
   function categoryTotals(transactions) {
     return transactions
-      .filter((transaction) => transaction.type === "expense")
       .reduce((totals, transaction) => {
         totals[transaction.category] = (totals[transaction.category] || 0) + transaction.amount;
         return totals;
@@ -952,7 +1171,7 @@
 
   function mapTransactionToApi(transaction) {
     return {
-      type: transaction.type,
+      type: "expense",
       category: transaction.category,
       note: transaction.note,
       amount: String(transaction.amount),
@@ -1012,7 +1231,7 @@
         apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`)
       ]);
       const budgets = summary.budgets || [];
-      state.money.transactions = transactions.map(mapTransactionFromApi);
+      state.money.transactions = transactions.map(mapTransactionFromApi).filter(Boolean);
       state.money.budgetRecords = budgets.map(budgetRecordFromApi);
       state.money.budgets = budgetsFromApi(budgets);
       state.money.categoryRecords = categories.map(categoryRecordFromApi);
@@ -1088,6 +1307,8 @@
       const month = state.money.filters.month || currentMonth();
       const payload = await apiRequest(`/api/friends?month=${encodeURIComponent(month)}`);
       friendsSync.items = Array.isArray(payload.friends) ? payload.friends.map(normalizeFriend).filter(Boolean) : [];
+      friendsSync.incoming = Array.isArray(payload.incoming_requests) ? payload.incoming_requests.map(normalizeFriendRequest).filter(Boolean) : [];
+      friendsSync.outgoing = Array.isArray(payload.outgoing_requests) ? payload.outgoing_requests.map(normalizeFriendRequest).filter(Boolean) : [];
       friendsSync.month = payload.month || month;
       friendsSync.loaded = true;
     } catch (error) {
@@ -1106,8 +1327,23 @@
       id: String(friend.id || ""),
       email: String(friend.email || ""),
       full_name: String(friend.full_name || ""),
+      avatar_url: String(friend.avatar_url || ""),
       budget_percent_used: Math.max(0, Number(friend.budget_percent_used || 0)),
       budget_count: Math.max(0, Number(friend.budget_count || 0))
+    };
+  }
+
+  function normalizeFriendRequest(request) {
+    if (!request || typeof request !== "object") return null;
+    return {
+      request_id: String(request.request_id || ""),
+      user_id: String(request.user_id || ""),
+      email: String(request.email || ""),
+      full_name: String(request.full_name || ""),
+      avatar_url: String(request.avatar_url || ""),
+      direction: String(request.direction || ""),
+      status: String(request.status || ""),
+      created_at: String(request.created_at || "")
     };
   }
 
@@ -1123,7 +1359,6 @@
             <th>Ngày</th>
             <th>Danh mục</th>
             <th>Ghi chú</th>
-            <th>Loại</th>
             <th class="amount">Số tiền</th>
             <th></th>
           </tr>
@@ -1134,8 +1369,7 @@
               <td>${formatDate(transaction.date)}</td>
               <td><span class="pill">${escapeHtml(categoryLabel(transaction.category))}</span></td>
               <td>${escapeHtml(transaction.note)}</td>
-              <td>${escapeHtml(transactionTypeLabel(transaction.type))}</td>
-              <td class="amount ${transaction.type}">${transaction.type === "income" ? "+" : "-"}${formatter.format(transaction.amount)}</td>
+              <td class="amount expense">${formatter.format(transaction.amount)}</td>
               <td>
                 <div class="actions">
                   <button class="button secondary icon" data-action="edit-transaction" data-id="${escapeAttr(transaction.id)}" title="Sửa">${svgIcon("edit")}</button>
@@ -1156,13 +1390,6 @@
       <form class="form-grid" data-form="transaction">
         <input type="hidden" name="id" value="${escapeAttr(editing ? editing.id : "")}">
         <div class="field">
-          <label for="transaction-type">Loại</label>
-          <select id="transaction-type" name="type" required>
-            ${option("expense", typeLabels.expense, editing?.type || "expense")}
-            ${option("income", typeLabels.income, editing?.type || "expense")}
-          </select>
-        </div>
-        <div class="field">
           <label for="transaction-date">Ngày</label>
           <input id="transaction-date" name="date" type="date" value="${editing?.date || new Date().toISOString().slice(0, 10)}" required>
         </div>
@@ -1174,7 +1401,7 @@
         </div>
         <div class="field">
           <label for="transaction-amount">Số tiền</label>
-          <input id="transaction-amount" name="amount" type="number" min="1000" step="1000" value="${editing?.amount || ""}" placeholder="0" required>
+          <input id="transaction-amount" name="amount" type="number" min="0" step="${escapeAttr(amountStep())}" value="${editing?.amount || ""}" placeholder="0" required>
         </div>
         <div class="field wide">
           <label for="transaction-note">Ghi chú</label>
@@ -1207,7 +1434,7 @@
           </div>
           <div class="field">
             <label for="budget-new-limit">Hạn mức</label>
-            <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="1000" placeholder="0" required>
+            <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="${escapeAttr(amountStep())}" placeholder="0" required>
           </div>
           <button class="button secondary" type="submit" ${hasAddOptions ? "" : "disabled"}>${svgIcon("plus")}Thêm</button>
         </form>
@@ -1237,9 +1464,11 @@
     const percent = Math.max(0, Number(item.percent || 0));
     const className = percent >= 100 ? "danger" : percent >= 80 ? "warning" : "";
     const color = normalizeBudgetColor(item.color);
+    const displayColor = percent >= 100 ? dangerBudgetColor : color;
+    const displayTint = percent >= 100 ? "rgba(225, 29, 72, 0.13)" : budgetColorTint(color);
     const isEditing = editingBudgetId === item.id;
     return `
-      <div class="category-chart-card budget-card" data-budget-row="${escapeAttr(item.id)}" style="--row-accent: ${escapeAttr(color)}; --row-bg: ${escapeAttr(budgetColorTint(color))}" title="${escapeAttr(categoryLabel(item.category))}: ${formatter.format(item.spent)} / ${formatter.format(item.limit)}">
+      <div class="category-chart-card budget-card ${className}" data-budget-row="${escapeAttr(item.id)}" style="--row-accent: ${escapeAttr(displayColor)}; --row-bg: ${escapeAttr(displayTint)}" title="${escapeAttr(categoryLabel(item.category))}: ${formatter.format(item.spent)} / ${formatter.format(item.limit)}">
         <div class="row-top">
           <strong>${escapeHtml(categoryLabel(item.category))}</strong>
           <span>${percent}%</span>
@@ -1271,7 +1500,7 @@
         </div>
         <div class="field">
           <label for="budget-${escapeAttr(item.id || slug(item.category))}">Hạn mức tháng</label>
-          <input id="budget-${escapeAttr(item.id || slug(item.category))}" name="limit_amount" type="number" min="0" step="1000" value="${item.limit}" required>
+          <input id="budget-${escapeAttr(item.id || slug(item.category))}" name="limit_amount" type="number" min="0" step="${escapeAttr(amountStep())}" value="${item.limit}" required>
         </div>
         <div class="field wide">
           <label>Màu</label>
@@ -1370,6 +1599,14 @@
       await deleteFriend(actionTarget.dataset.friendId);
     }
 
+    if (action === "accept-friend-request") {
+      await acceptFriendRequest(actionTarget.dataset.requestId);
+    }
+
+    if (action === "reject-friend-request" || action === "cancel-friend-request") {
+      await deleteFriendRequest(actionTarget.dataset.requestId, action === "cancel-friend-request");
+    }
+
     if (action === "cancel-edit") {
       editingId = null;
       renderActiveModule();
@@ -1457,6 +1694,20 @@
       return;
     }
 
+    const profileForm = event.target.closest("[data-form='profile']");
+    if (profileForm) {
+      event.preventDefault();
+      await saveProfile(profileForm);
+      return;
+    }
+
+    const passwordForm = event.target.closest("[data-form='password']");
+    if (passwordForm) {
+      event.preventDefault();
+      await changePassword(passwordForm);
+      return;
+    }
+
     const form = event.target.closest("[data-form='transaction']");
     if (!form) return;
 
@@ -1465,7 +1716,7 @@
     const id = String(formData.get("id") || "");
     const transaction = {
       id,
-      type: String(formData.get("type")),
+      type: "expense",
       date: String(formData.get("date")),
       category: String(formData.get("category")),
       amount: Number(formData.get("amount")),
@@ -1528,7 +1779,7 @@
         body: { email, password }
       });
       auth.token = token.access_token;
-      auth.user = await apiRequest("/api/auth/me", { token: auth.token });
+      auth.user = normalizeUser(await apiRequest("/api/auth/me", { token: auth.token }));
       moneySync.loaded = false;
       moneySync.budgetMonth = "";
       moneySync.error = "";
@@ -1537,6 +1788,64 @@
       showToast(mode === "register" ? "Tạo tài khoản thành công." : "Đăng nhập thành công.");
     } catch (error) {
       showToast(error.message || "Không thể kết nối API.");
+    }
+  }
+
+  async function saveProfile(form) {
+    const formData = new FormData(form);
+    const fullName = String(formData.get("full_name") || "").trim();
+    const avatarUrl = String(formData.get("avatar_url") || "").trim();
+    const currency = String(formData.get("currency") || "VND");
+    if (!fullName) {
+      showToast("Hãy nhập họ tên.");
+      return;
+    }
+
+    try {
+      auth.user = normalizeUser(await apiRequest("/api/auth/me", {
+        method: "PATCH",
+        body: {
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          currency
+        }
+      }));
+      saveAuth();
+      moneySync.loaded = false;
+      friendsSync.loaded = false;
+      app();
+      showToast("Đã lưu hồ sơ.");
+    } catch (error) {
+      showToast(error.message || "Không thể lưu hồ sơ.");
+    }
+  }
+
+  async function changePassword(form) {
+    const formData = new FormData(form);
+    const currentPassword = String(formData.get("current_password") || "");
+    const newPassword = String(formData.get("new_password") || "");
+    const confirmPassword = String(formData.get("confirm_password") || "");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToast("Hãy nhập đầy đủ mật khẩu.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast("Mật khẩu mới chưa khớp.");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/auth/password", {
+        method: "PATCH",
+        body: {
+          current_password: currentPassword,
+          new_password: newPassword
+        }
+      });
+      form.reset();
+      showToast("Đã đổi mật khẩu.");
+    } catch (error) {
+      showToast(error.message || "Không thể đổi mật khẩu.");
     }
   }
 
@@ -1568,6 +1877,8 @@
   function apiErrorMessage(detail, status) {
     if (detail === "Email is already registered") return "Email này đã được đăng ký.";
     if (detail === "Incorrect email or password") return "Email hoặc mật khẩu không đúng.";
+    if (detail === "Current password is incorrect") return "Mật khẩu hiện tại không đúng.";
+    if (detail === "Income transactions are disabled") return "Ứng dụng hiện chỉ theo dõi khoản chi.";
     if (detail === "Budget already exists for this category and month") return "Danh mục này đã có ngân sách trong tháng.";
     if (detail === "Budget not found") return "Không tìm thấy ngân sách.";
     if (detail === "Category already exists") return "Danh mục này đã tồn tại.";
@@ -1576,6 +1887,9 @@
     if (detail === "Friend user not found") return "Không tìm thấy người dùng này.";
     if (detail === "Cannot add yourself as a friend") return "Bạn không thể thêm chính mình.";
     if (detail === "Friend already exists") return "Người này đã có trong danh sách bạn bè.";
+    if (detail === "Friend request already exists") return "Lời mời kết bạn đã tồn tại.";
+    if (detail === "Friend request not found") return "Không tìm thấy lời mời kết bạn.";
+    if (detail === "Friend request is not yours") return "Bạn không thể thao tác lời mời này.";
     if (detail === "Friend not found") return "Không tìm thấy bạn bè.";
     if (status === 0) return "Không thể kết nối API.";
     if (typeof detail === "string") return detail;
@@ -1739,16 +2053,16 @@
     }
 
     try {
-      await apiRequest(`/api/friends?month=${encodeURIComponent(state.money.filters.month || currentMonth())}`, {
+      await apiRequest("/api/friends", {
         method: "POST",
         body: { identifier }
       });
       form.reset();
       friendsSync.loaded = false;
       await loadFriendsFromApi();
-      showToast("Đã thêm bạn bè.");
+      showToast("Đã gửi lời mời kết bạn.");
     } catch (error) {
-      showToast(error.message || "Không thể thêm bạn bè.");
+      showToast(error.message || "Không thể gửi lời mời.");
     }
   }
 
@@ -1765,6 +2079,38 @@
       showToast("Đã xóa bạn bè.");
     } catch (error) {
       showToast(error.message || "Không thể xóa bạn bè.");
+    }
+  }
+
+  async function acceptFriendRequest(id) {
+    if (!id) {
+      showToast("Lời mời chưa sẵn sàng.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/friends/requests/${encodeURIComponent(id)}/accept?month=${encodeURIComponent(state.money.filters.month || currentMonth())}`, { method: "POST" });
+      friendsSync.loaded = false;
+      await loadFriendsFromApi();
+      showToast("Đã chấp nhận lời mời.");
+    } catch (error) {
+      showToast(error.message || "Không thể chấp nhận lời mời.");
+    }
+  }
+
+  async function deleteFriendRequest(id, isCancel) {
+    if (!id) {
+      showToast("Lời mời chưa sẵn sàng.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/friends/requests/${encodeURIComponent(id)}`, { method: "DELETE" });
+      friendsSync.loaded = false;
+      await loadFriendsFromApi();
+      showToast(isCancel ? "Đã hủy lời mời." : "Đã từ chối lời mời.");
+    } catch (error) {
+      showToast(error.message || "Không thể cập nhật lời mời.");
     }
   }
 
@@ -1793,7 +2139,7 @@
           })
         ))
       );
-      state.money.filters = { month, type: "all", category: "all", search: "" };
+      state.money.filters = { month, type: "expense", category: "all", search: "" };
       editingId = null;
       editingBudgetId = null;
       await loadMoneyFromApi();

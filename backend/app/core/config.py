@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Universal App API"
     environment: str = "development"
     secret_key: str = Field(default="change-this-dev-secret")
-    access_token_expire_minutes: int = 60
+    access_token_expire_minutes: int = 43200
     database_url: str = "sqlite:///./universal_app.db"
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000

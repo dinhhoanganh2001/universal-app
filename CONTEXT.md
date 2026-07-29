@@ -7,13 +7,14 @@ This file is the shared working context for contributors and coding agents. Read
 - The project is a small universal personal app, currently focused on money tracking.
 - The frontend is static HTML/CSS/JavaScript: `index.html`, `src/styles.css`, `src/app.js`.
 - Local service ports are configured through the root `.env` file copied from `.env.example`.
-- The app language is Vietnamese and the displayed currency is VND.
+- The app language is Vietnamese. Users can choose VND, Dollar, or Euro display/input formatting in `Hồ sơ`; stored amounts are not exchange-rate converted.
 - Default money category values are Vietnamese in the frontend. Known legacy English default names are translated/migrated for older local and backend data.
 - Project documentation, scripts, backend internals, and collaboration notes should stay in English unless explicitly requested.
 - The backend is a FastAPI app under `backend/`.
-- Authentication exists with register/login/me endpoints and JWT bearer tokens.
-- Friend APIs exist for adding users by email/id and reading friend aggregate budget progress percentages.
-- Money backend APIs exist for transactions, budgets, and monthly summaries.
+- Authentication exists with register/login/me endpoints, profile update, password change, and JWT bearer tokens.
+- JWT sessions default to 30 days through `ACCESS_TOKEN_EXPIRE_MINUTES=43200`.
+- Friend APIs use pending requests: adding by email/id creates a request, the other user must accept, and accepted friends show only aggregate budget progress percentages.
+- Money backend APIs exist for expense transactions, budgets, and monthly summaries.
 - Money category APIs exist for user-defined category names.
 - The frontend login/register screen talks to the backend auth endpoints.
 - After login, the frontend money tracker syncs transactions and budgets with the backend.
@@ -22,11 +23,13 @@ This file is the shared working context for contributors and coding agents. Read
 - Users can manage money categories on the `Danh mục` page.
 - The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add dropdown shows the full defined category list and blocks duplicate current-month budgets with a toast.
 - Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage.
+- Users can manage profile settings on the `Hồ sơ` page, including display name, avatar URL, currency preference, and password.
+- The current money UI is cost/budget focused: income categories, income transaction controls, and income summary cards are hidden/disabled.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
 - Budget progress includes an overall monthly total progress bar above category cards.
 - Budget progress uses two-column chart cards per category with percentage used and spent/limit values.
 - Budget cards show read-only category names; card edit mode changes only monthly amount and background color.
-- Red is reserved for over-budget/danger states and is not available in user-selected budget card colors.
+- Red is reserved for over-budget/danger states, is not available in user-selected budget card colors, and budget cards at or above 100% automatically render with red danger styling.
 - The UI uses a more colorful visual system with varied card accents, richer sidebar/auth surfaces, colorful progress bars, and chart colors.
 - `index.html` includes version query strings on frontend assets to avoid stale browser cache after deploys.
 - The visible money screen no longer exposes import/export/demo-data buttons.
@@ -79,8 +82,8 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - `backend/app/main.py`: FastAPI app setup and CORS middleware.
 - `backend/app/core/config.py`: settings, database URL, CORS origins.
 - `backend/app/core/security.py`: JWT and password hashing.
-- `backend/app/api/v1/auth.py`: register, login, current user.
-- `backend/app/api/v1/friends.py`: friend add/list/delete endpoints and aggregate friend budget percent calculation.
+- `backend/app/api/v1/auth.py`: register, login, current user, profile update, password change.
+- `backend/app/api/v1/friends.py`: friend request create/accept/reject/cancel, friend delete, and aggregate friend budget percent calculation.
 - `backend/app/api/v1/money.py`: transaction, budget, and summary endpoints.
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
 - `backend/scripts/cors_smoke_test.py`: CORS preflight smoke test.
@@ -92,9 +95,9 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - Use SQLite by default through `DATABASE_URL`; this can move to Postgres later without changing route logic.
 - Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`, while `API_BASE_URL` and `BACKEND_CORS_ORIGINS` use the real IP/domain reachable by the browser.
 - Keep frontend module labels and money UI in Vietnamese.
-- Keep backend schema field names in English, with stable enum values `income` and `expense`.
+- Keep backend schema field names in English. The transaction table still has a `type` field for compatibility, but the API/UI currently accept and show only `expense` transactions.
 - Store JWT in `localStorage` for now for simple local development.
-- Friend progress intentionally exposes only aggregate percentage and budget count, not friend money amounts.
+- Friend progress intentionally exposes only aggregate percentage and budget count, not friend money amounts; pending friend requests expose identity/status only.
 - Use root `AGENTS.md` for agent instructions instead of a `.codex` directory, because it is more visible to collaborators and coding agents.
 
 ## Known Gaps
@@ -103,7 +106,8 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - Import/export helper code still exists in `src/app.js`, but it is not exposed in the current UI.
 - There are no Alembic migrations yet; tables are created by `Base.metadata.create_all`.
 - There is no production auth hardening yet: refresh tokens, cookie-based auth, rate limits, password reset, email verification, or CSRF strategy.
-- Friend links do not have invitations, acceptance, blocking, or per-user privacy controls yet.
+- Currency selection only changes formatting and numeric input step; it does not convert existing amounts between currencies.
+- Friend links do not have blocking or per-user privacy controls yet.
 - There is no automated frontend browser test yet.
 
 ## Verification Commands
@@ -148,3 +152,9 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Changed frontend money category defaults, demo data, local-state normalization, and backend category-load migration so known default categories use Vietnamese names instead of legacy English values.
 - Synced budget and transaction add dropdowns to the `Danh mục` page category list instead of mixing in historical transaction/budget categories.
 - Changed the budget-add dropdown to show the full defined category list and show `Đã có ngân sách cho hạn mục này, xem ở dưới` when a selected category already has a budget this month.
+- Expanded budget card edit color choices with additional non-red-adjacent swatches, removed the old orange/red-adjacent selectable color, and made budget cards automatically render red danger styling when progress is at or above 100%.
+- Added user profile settings with display name, avatar URL, currency preference, account info, and password change.
+- Added VND, Dollar, and Euro formatting preferences controlled from the profile page.
+- Changed friend adding into a request flow with incoming accept/reject and outgoing cancel actions; existing direct friendship rows migrate as accepted.
+- Removed income from the active money workflow: defaults/demo data exclude income categories, transaction forms submit only expenses, API transaction lists/summaries are expense-only, and old local income rows are ignored.
+- Extended default login sessions to 30 days.

@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.money import Budget, Transaction
 from app.models.social import Friendship
 from app.models.user import User
-from app.schemas.social import FriendCreate, FriendList, FriendRead
+from app.schemas.social import FriendCreate, FriendList, FriendRead, FriendRequestRead
 
 
 router = APIRouter()
@@ -22,47 +22,112 @@ def list_friends(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FriendList:
-    rows = db.execute(
-        select(Friendship, User)
-        .join(User, User.id == Friendship.friend_id)
-        .where(Friendship.owner_id == current_user.id)
-        .order_by(User.full_name.asc(), User.email.asc())
-    ).all()
+    rows = list(
+        db.scalars(
+            select(Friendship)
+            .where(
+                Friendship.status == "accepted",
+                or_(
+                    Friendship.owner_id == current_user.id,
+                    Friendship.friend_id == current_user.id,
+                ),
+            )
+            .order_by(Friendship.created_at.desc())
+        )
+    )
+    pending_rows = list(
+        db.scalars(
+            select(Friendship)
+            .where(
+                Friendship.status == "pending",
+                or_(
+                    Friendship.owner_id == current_user.id,
+                    Friendship.friend_id == current_user.id,
+                ),
+            )
+            .order_by(Friendship.created_at.desc())
+        )
+    )
 
     return FriendList(
         month=month,
         friends=[
-            friend_read(db, friend_user, month)
-            for _, friend_user in rows
+            friend_read(db, other_friend_user(db, row, current_user.id), month)
+            for row in rows
+        ],
+        incoming_requests=[
+            friend_request_read(db, row, current_user.id)
+            for row in pending_rows
+            if row.friend_id == current_user.id
+        ],
+        outgoing_requests=[
+            friend_request_read(db, row, current_user.id)
+            for row in pending_rows
+            if row.owner_id == current_user.id
         ],
     )
 
 
-@router.post("", response_model=FriendRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FriendRequestRead, status_code=status.HTTP_201_CREATED)
 def create_friend(
     payload: FriendCreate,
-    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> FriendRead:
+) -> FriendRequestRead:
     friend_user = find_friend_user(db, payload.identifier)
     if not friend_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend user not found")
     if friend_user.id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot add yourself as a friend")
 
-    existing = db.scalar(
-        select(Friendship).where(
-            Friendship.owner_id == current_user.id,
-            Friendship.friend_id == friend_user.id,
-        )
-    )
+    existing = friendship_between(db, current_user.id, friend_user.id)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Friend already exists")
+        if existing.status == "accepted":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Friend already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Friend request already exists")
 
-    db.add(Friendship(owner_id=current_user.id, friend_id=friend_user.id))
+    friendship = Friendship(
+        owner_id=current_user.id,
+        friend_id=friend_user.id,
+        requested_by_id=current_user.id,
+        status="pending",
+    )
+    db.add(friendship)
     db.commit()
-    return friend_read(db, friend_user, month)
+    db.refresh(friendship)
+    return friend_request_read(db, friendship, current_user.id)
+
+
+@router.post("/requests/{request_id}/accept", response_model=FriendRead)
+def accept_friend_request(
+    request_id: int,
+    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FriendRead:
+    friendship = get_pending_request(db, request_id)
+    if friendship.friend_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Friend request is not yours")
+
+    friendship.status = "accepted"
+    db.add(friendship)
+    db.commit()
+    db.refresh(friendship)
+    return friend_read(db, other_friend_user(db, friendship, current_user.id), month)
+
+
+@router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_friend_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    friendship = get_pending_request(db, request_id)
+    if current_user.id not in {friendship.owner_id, friendship.friend_id}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Friend request is not yours")
+
+    db.delete(friendship)
+    db.commit()
 
 
 @router.delete("/{friend_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -71,13 +136,10 @@ def delete_friend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    friendship = db.scalar(
-        select(Friendship).where(
-            Friendship.owner_id == current_user.id,
-            Friendship.friend_id == friend_id,
-        )
-    )
+    friendship = friendship_between(db, current_user.id, friend_id)
     if not friendship:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend not found")
+    if friendship.status != "accepted":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend not found")
 
     db.delete(friendship)
@@ -96,9 +158,55 @@ def friend_read(db: Session, friend_user: User, month: str) -> FriendRead:
         id=friend_user.id,
         email=friend_user.email,
         full_name=friend_user.full_name,
+        avatar_url=friend_user.avatar_url,
         budget_percent_used=friend_budget_percent(db, friend_user.id, month),
         budget_count=friend_budget_count(db, friend_user.id, month),
     )
+
+
+def friend_request_read(db: Session, friendship: Friendship, current_user_id: int) -> FriendRequestRead:
+    friend_user = other_friend_user(db, friendship, current_user_id)
+    return FriendRequestRead(
+        request_id=friendship.id,
+        user_id=friend_user.id,
+        email=friend_user.email,
+        full_name=friend_user.full_name,
+        avatar_url=friend_user.avatar_url,
+        direction="incoming" if friendship.friend_id == current_user_id else "outgoing",
+        status=friendship.status,
+        created_at=friendship.created_at,
+    )
+
+
+def friendship_between(db: Session, first_user_id: int, second_user_id: int) -> Friendship | None:
+    return db.scalar(
+        select(Friendship).where(
+            or_(
+                (Friendship.owner_id == first_user_id) & (Friendship.friend_id == second_user_id),
+                (Friendship.owner_id == second_user_id) & (Friendship.friend_id == first_user_id),
+            )
+        )
+    )
+
+
+def get_pending_request(db: Session, request_id: int) -> Friendship:
+    friendship = db.scalar(
+        select(Friendship).where(
+            Friendship.id == request_id,
+            Friendship.status == "pending",
+        )
+    )
+    if not friendship:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend request not found")
+    return friendship
+
+
+def other_friend_user(db: Session, friendship: Friendship, current_user_id: int) -> User:
+    other_user_id = friendship.friend_id if friendship.owner_id == current_user_id else friendship.owner_id
+    user = db.scalar(select(User).where(User.id == other_user_id))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend user not found")
+    return user
 
 
 def friend_budget_count(db: Session, owner_id: int, month: str) -> int:
