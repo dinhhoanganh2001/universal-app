@@ -5,8 +5,6 @@
   const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
   const legacyCategoryLabels = {
-    Salary: "Lương",
-    Freelance: "Làm thêm",
     Food: "Ăn uống",
     Housing: "Nhà ở",
     Transport: "Di chuyển",
@@ -14,12 +12,22 @@
     Health: "Sức khỏe",
     Entertainment: "Giải trí",
     Shopping: "Mua sắm",
-    Savings: "Tiết kiệm",
     Other: "Khác"
   };
 
-  const defaultCategories = Object.values(legacyCategoryLabels)
-    .filter((name) => !["Lương", "Làm thêm", "Tiết kiệm"].includes(name));
+  const excludedDefaultCategories = new Set(["Salary", "Freelance", "Savings", "Lương", "Làm thêm", "Tiết kiệm"]);
+  const defaultCategories = [
+    "Nhà ở",
+    "Ăn uống",
+    "Gửi bố mẹ",
+    "Hóa đơn",
+    "Di chuyển",
+    "Sức khỏe",
+    "Dating",
+    "Mua sắm",
+    "Giải trí",
+    "Khác"
+  ];
   const categoryLabels = legacyCategoryLabels;
 
   const typeLabels = {
@@ -33,13 +41,15 @@
   };
 
   const defaultBudgets = {
-    "Ăn uống": 6000000,
     "Nhà ở": 12000000,
-    "Di chuyển": 2500000,
+    "Ăn uống": 6000000,
+    "Gửi bố mẹ": 3000000,
     "Hóa đơn": 3000000,
+    "Di chuyển": 2500000,
     "Sức khỏe": 2500000,
-    "Giải trí": 3000000,
+    "Dating": 2500000,
     "Mua sắm": 4000000,
+    "Giải trí": 3000000,
     "Khác": 2000000
   };
 
@@ -226,7 +236,7 @@
 
   function normalizeCategories(values) {
     const source = Array.isArray(values) && values.length ? values : defaultCategories;
-    return [...new Set(source.map(localizeCategoryName).filter(Boolean))].slice(0, 80);
+    return [...new Set(source.map(localizeCategoryName).filter((name) => name && !excludedDefaultCategories.has(name)))].slice(0, 80);
   }
 
   function localizeCategoryName(category) {
@@ -627,7 +637,7 @@
     const currency = currencyByCode(draft.currency);
     const formatter = formatterForCurrency(currency);
     const selectedNames = new Set(draft.rows.map((row) => row.category.toLowerCase()));
-    const recommendations = definedCategoryOptions().filter((category) => !selectedNames.has(category.toLowerCase()));
+    const recommendations = onboardingRecommendationOptions().filter((category) => !selectedNames.has(category.toLowerCase()));
     return `
       <main class="onboarding-shell">
         <section class="onboarding-frame">
@@ -719,6 +729,7 @@
               </div>
               <div class="form-actions">
                 ${auth.user?.onboarding_completed ? `<button class="button secondary" type="button" data-action="cancel-onboarding">Hủy</button>` : ""}
+                <button class="button secondary" type="button" data-action="skip-onboarding">Thiết lập sau</button>
                 <button class="button" type="submit">Lưu thiết lập</button>
               </div>
             </div>
@@ -1518,6 +1529,10 @@
     return normalizeCategories(state.money.categories);
   }
 
+  function onboardingRecommendationOptions() {
+    return normalizeCategories([...defaultCategories, ...definedCategoryOptions()]);
+  }
+
   function transactionCategoryOptions(editing) {
     const categories = definedCategoryOptions();
     if (editing?.category && !categories.includes(editing.category)) {
@@ -1932,6 +1947,10 @@
       onboardingActive = false;
       onboardingDraft = null;
       app();
+    }
+
+    if (action === "skip-onboarding") {
+      await skipOnboarding();
     }
 
     if (action === "add-onboarding-recommendation") {
@@ -2380,6 +2399,24 @@
       showToast("Đã lưu thiết lập ban đầu.");
     } catch (error) {
       showToast(error.message || "Không thể lưu thiết lập ban đầu.");
+    }
+  }
+
+  async function skipOnboarding() {
+    try {
+      auth.user = normalizeUser(await apiRequest("/api/auth/onboarding", {
+        method: "PATCH",
+        body: { monthly_income: String(auth.user?.monthly_income || 0) }
+      }));
+      onboardingActive = false;
+      onboardingDraft = null;
+      moneySync.loaded = false;
+      moneySync.budgetMonth = "";
+      saveAuth();
+      app();
+      showToast("Bạn có thể thiết lập ngân sách sau trong Hồ sơ.");
+    } catch (error) {
+      showToast(error.message || "Không thể bỏ qua thiết lập ban đầu.");
     }
   }
 
