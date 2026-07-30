@@ -55,6 +55,14 @@ def ensure_runtime_schema() -> None:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN currency VARCHAR(3) DEFAULT 'VND' NOT NULL")
                 )
+            if "monthly_income" not in user_columns:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN monthly_income NUMERIC(12, 2) DEFAULT 0 NOT NULL")
+                )
+            if "onboarding_completed" not in user_columns:
+                connection.execute(
+                    text("ALTER TABLE users ADD COLUMN onboarding_completed BOOLEAN DEFAULT 0 NOT NULL")
+                )
 
     if "friendships" in table_names:
         friendship_columns = {column["name"] for column in inspector.get_columns("friendships")}
@@ -71,8 +79,18 @@ def ensure_runtime_schema() -> None:
         return
 
     budget_columns = {column["name"] for column in inspector.get_columns("budgets")}
-    if "color" not in budget_columns:
-        with engine.begin() as connection:
+    with engine.begin() as connection:
+        if "minimum_amount" not in budget_columns:
+            connection.execute(
+                text("ALTER TABLE budgets ADD COLUMN minimum_amount NUMERIC(12, 2) DEFAULT 0 NOT NULL")
+            )
+            connection.execute(text("UPDATE budgets SET minimum_amount = limit_amount WHERE minimum_amount = 0"))
+        if "full_amount" not in budget_columns:
+            connection.execute(
+                text("ALTER TABLE budgets ADD COLUMN full_amount NUMERIC(12, 2) DEFAULT 0 NOT NULL")
+            )
+            connection.execute(text("UPDATE budgets SET full_amount = limit_amount WHERE full_amount = 0"))
+        if "color" not in budget_columns:
             connection.execute(
                 text("ALTER TABLE budgets ADD COLUMN color VARCHAR(20) DEFAULT '#2563eb' NOT NULL")
             )

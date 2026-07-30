@@ -224,11 +224,23 @@ def upsert_budget(
             Budget.month == payload.month,
         )
     )
+    minimum_amount = payload.minimum_amount if payload.minimum_amount is not None else payload.limit_amount
+    full_amount = payload.full_amount if payload.full_amount is not None else payload.limit_amount
     if budget:
         budget.limit_amount = payload.limit_amount
+        budget.minimum_amount = minimum_amount
+        budget.full_amount = full_amount
         budget.color = payload.color
     else:
-        budget = Budget(owner_id=current_user.id, **payload.model_dump())
+        budget = Budget(
+            owner_id=current_user.id,
+            category=payload.category,
+            month=payload.month,
+            limit_amount=payload.limit_amount,
+            minimum_amount=minimum_amount,
+            full_amount=full_amount,
+            color=payload.color,
+        )
         db.add(budget)
 
     db.commit()
@@ -373,6 +385,8 @@ def budget_read(db: Session, owner_id: int, budget: Budget) -> BudgetRead:
         category=budget.category,
         month=budget.month,
         limit_amount=budget.limit_amount,
+        minimum_amount=budget.minimum_amount,
+        full_amount=budget.full_amount,
         color=budget.color,
         spent_amount=spent_amount,
         percent_used=percent_used,

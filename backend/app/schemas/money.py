@@ -50,6 +50,8 @@ class BudgetUpsert(BaseModel):
     category: str = Field(min_length=1, max_length=60)
     month: str = Field(pattern=r"^\d{4}-\d{2}$")
     limit_amount: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    minimum_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    full_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     color: str = Field(default="#2563eb", pattern=r"^#[0-9A-Fa-f]{6}$")
 
     @field_validator("category")
@@ -62,6 +64,8 @@ class BudgetUpdate(BaseModel):
     category: str | None = Field(default=None, min_length=1, max_length=60)
     month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     limit_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    minimum_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    full_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
     @field_validator("category")

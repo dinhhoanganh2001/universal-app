@@ -40,6 +40,7 @@ The API will be available at `http://127.0.0.1:8000` by default. Use `start_serv
 - `GET /api/auth/me`
 - `PATCH /api/auth/me`
 - `PATCH /api/auth/password`
+- `PATCH /api/auth/onboarding`
 - `GET /api/friends?month=YYYY-MM`
 - `POST /api/friends`
 - `POST /api/friends/requests/{request_id}/accept?month=YYYY-MM`

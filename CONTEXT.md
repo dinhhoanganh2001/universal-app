@@ -24,10 +24,13 @@ This file is the shared working context for contributors and coding agents. Read
 - The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add dropdown shows the full defined category list and blocks duplicate current-month budgets with a toast.
 - Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage; the page also shows the current user as a local, non-removable comparison row.
 - Users can manage profile settings on the `Hồ sơ` page, including display name, avatar URL, currency preference, and password.
+- First-time login shows an onboarding screen that asks currency unit, monthly income, and two budget levels per category: `Chi tiêu tối thiểu` and `Chi tiêu đầy đủ`; users can rerun it from `Hồ sơ`. Registration auto-login is allowed, onboarding only appears for an authenticated user, and onboarding money fields intentionally start blank instead of prefilled from saved values. The onboarding screen shows financial independence/freedom timeline estimates directly while the user enters values.
+- Onboarding has a recommended category list and a user-selected category list. Users add recommendations into their list, use the plus control at the end of recommendations to add custom categories, remove selected categories, and the two budget levels are saved independently without requiring `Chi tiêu đầy đủ` to be greater than `Chi tiêu tối thiểu`. Selected onboarding rows use polished card-style edit/display modes: users type values while editing, then confirm the row into labels and can reopen it with the edit button.
+- The budget dashboard estimates time to `Độc lập tài chính` from 25 years of `Chi tiêu tối thiểu`, and `Tự do tài chính` from 25 years of `Chi tiêu đầy đủ`, using monthly income minus the matching budget level as monthly savings.
 - The current money UI is cost/budget focused: income categories, income transaction controls, and income summary cards are hidden/disabled.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
 - Budget progress includes an overall monthly total progress bar above category cards.
-- Budget progress uses two-column chart cards per category with percentage used and spent/limit values.
+- Budget progress uses two-column chart cards per category with percentage used, spent/limit values, and saved minimum/full spending levels.
 - Budget cards show read-only category names; card edit mode changes only monthly amount and background color.
 - Red is reserved for over-budget/danger states, is not available in user-selected budget card colors, and budget cards at or above 100% automatically render with red danger styling.
 - The UI uses a more colorful visual system with varied card accents, richer sidebar/auth surfaces, colorful progress bars, and chart colors.
@@ -83,7 +86,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - `backend/app/main.py`: FastAPI app setup and CORS middleware.
 - `backend/app/core/config.py`: settings, database URL, CORS origins.
 - `backend/app/core/security.py`: JWT and password hashing.
-- `backend/app/api/v1/auth.py`: register, login, current user, profile update, password change.
+- `backend/app/api/v1/auth.py`: register, login, current user, profile update, password change, onboarding completion.
 - `backend/app/api/v1/friends.py`: friend request create/accept/reject/cancel, friend delete, and aggregate friend budget percent calculation.
 - `backend/app/api/v1/money.py`: transaction, budget, and summary endpoints.
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
@@ -96,6 +99,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - Use SQLite by default through `DATABASE_URL`; this can move to Postgres later without changing route logic.
 - Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`, while `API_BASE_URL` and `BACKEND_CORS_ORIGINS` use the real IP/domain reachable by the browser.
 - Keep frontend module labels and money UI in Vietnamese.
+- UI and UX quality should be treated as a core requirement: flows should be polished, clear, compact, responsive, and easy to use before work is considered complete.
 - Keep backend schema field names in English. The transaction table still has a `type` field for compatibility, but the API/UI currently accept and show only `expense` transactions.
 - Store JWT in `localStorage` for now for simple local development.
 - Friend progress intentionally exposes only aggregate percentage and budget count, not friend money amounts; pending friend requests expose identity/status only.
@@ -108,6 +112,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - There are no Alembic migrations yet; tables are created by `Base.metadata.create_all`.
 - There is no production auth hardening yet: refresh tokens, cookie-based auth, rate limits, password reset, email verification, or CSRF strategy.
 - Currency selection only changes formatting and numeric input step; it does not convert existing amounts between currencies.
+- Onboarding income is stored for planning context only; the active money workflow still tracks expenses and budgets, not income transactions.
 - Friend links do not have blocking or per-user privacy controls yet.
 - There is no automated frontend browser test yet.
 
@@ -161,3 +166,12 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Removed income from the active money workflow: defaults/demo data exclude income categories, transaction forms submit only expenses, API transaction lists/summaries are expense-only, and old local income rows are ignored.
 - Extended default login sessions to 30 days.
 - Added the current user to the `Bạn bè` list as a non-removable comparison row using the same aggregate budget percent format as friends.
+- Added first-login onboarding with monthly income and two per-category budget levels (`Chi tiêu tối thiểu`, `Chi tiêu đầy đủ`), plus a profile action to rerun onboarding.
+- Added financial timeline estimates for `Độc lập tài chính` and `Tự do tài chính` based on monthly income and the two onboarding budget levels.
+- Kept registration auto-login, ensured onboarding only appears for authenticated users, and kept onboarding input fields empty when opened.
+- Reworked onboarding category setup into recommended and user-selected lists with add/remove/custom category controls, and removed the validation that forced full spending to be at least minimum spending.
+- Added currency unit selection to onboarding and persisted it through the existing profile update endpoint before onboarding completion.
+- Replaced the separate onboarding custom-category row with a plus control at the end of the recommended list that expands into an inline name input.
+- Changed selected onboarding budget rows from always-editable boxes into confirmed label rows with explicit edit and delete controls.
+- Fixed the onboarding selected-row layout so edit fields no longer squeeze the action buttons, and the delete button remains visible.
+- Widened the onboarding setup panel, reduced and tightened the left explanation column so it fits in one desktop viewport, narrowed the recommendation list, and added live onboarding estimate cards for `Độc lập tài chính` and `Tự do tài chính`.

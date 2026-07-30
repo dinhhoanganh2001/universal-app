@@ -77,7 +77,8 @@
     user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z",
     friends: "M17 21a6 6 0 0 0-12 0M11 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4M23 21a5 5 0 0 0-7-4.6M17 3a4 4 0 0 1 0 8",
     chevronLeft: "M15 18l-6-6 6-6",
-    chevronRight: "M9 18l6-6-6-6"
+    chevronRight: "M9 18l6-6-6-6",
+    check: "M20 6 9 17l-5-5"
   };
 
   const state = loadState();
@@ -101,6 +102,8 @@
   let activeModuleId = "money";
   let editingId = null;
   let editingBudgetId = null;
+  let onboardingActive = false;
+  let onboardingDraft = null;
 
   const modules = [
     {
@@ -251,6 +254,8 @@
       category: localizeCategoryName(budget.category || "Khác").slice(0, 60),
       month: /^\d{4}-\d{2}$/.test(String(budget.month)) ? String(budget.month) : currentMonth(),
       limit: Math.max(0, Number(budget.limit || budget.limit_amount || 0)),
+      minimum: Math.max(0, Number(budget.minimum || budget.minimum_amount || budget.limit || budget.limit_amount || 0)),
+      full: Math.max(0, Number(budget.full || budget.full_amount || budget.limit || budget.limit_amount || 0)),
       spent: Math.max(0, Number(budget.spent || budget.spent_amount || 0)),
       percent: Math.max(0, Number(budget.percent || budget.percent_used || 0)),
       color: normalizeBudgetColor(budget.color)
@@ -343,6 +348,8 @@
       full_name: String(user.full_name || "").trim(),
       avatar_url: String(user.avatar_url || "").trim(),
       currency,
+      monthly_income: Math.max(0, Number(user.monthly_income || 0)),
+      onboarding_completed: Boolean(user.onboarding_completed),
       created_at: String(user.created_at || "")
     };
   }
@@ -419,11 +426,15 @@
   }
 
   function activeCurrency() {
-    return currencyOptions[auth.user?.currency] || currencyOptions.VND;
+    return currencyByCode(auth.user?.currency);
   }
 
   function amountStep() {
     return activeCurrency().step;
+  }
+
+  function currencyByCode(code) {
+    return currencyOptions[code] || currencyOptions.VND;
   }
 
   function formatDate(value) {
@@ -469,6 +480,13 @@
       return;
     }
 
+    if (onboardingActive || !auth.user?.onboarding_completed) {
+      root.className = "auth-root";
+      root.innerHTML = renderOnboarding();
+      bindRoot(root);
+      return;
+    }
+
     root.className = "app-shell";
     root.innerHTML = `
       <aside class="sidebar">
@@ -508,6 +526,7 @@
     root.addEventListener("click", handleClick);
     root.addEventListener("input", handleInput);
     root.addEventListener("change", handleChange);
+    root.addEventListener("keydown", handleKeydown);
     root.addEventListener("submit", handleSubmit);
     root.dataset.bound = "true";
   }
@@ -603,6 +622,288 @@
     `;
   }
 
+  function renderOnboarding() {
+    const draft = ensureOnboardingDraft();
+    const currency = currencyByCode(draft.currency);
+    const formatter = formatterForCurrency(currency);
+    const selectedNames = new Set(draft.rows.map((row) => row.category.toLowerCase()));
+    const recommendations = definedCategoryOptions().filter((category) => !selectedNames.has(category.toLowerCase()));
+    return `
+      <main class="onboarding-shell">
+        <section class="onboarding-frame">
+          <div class="onboarding-copy">
+            <p class="eyebrow">Thiết lập ban đầu</p>
+            <h1>Lập ngân sách theo cách bạn thật sự chi tiêu.</h1>
+            <p>Nhập thu nhập tháng và hai mức ngân sách cho từng danh mục. Có thể chạy lại trong Hồ sơ.</p>
+            <div class="onboarding-definitions">
+              <div>
+                <strong>Chi tiêu tối thiểu</strong>
+                <span>Mức cần thiết mỗi tháng: hóa đơn bắt buộc, ăn uống cơ bản, di chuyển và khoản không nên bỏ.</span>
+              </div>
+              <div>
+                <strong>Chi tiêu đầy đủ</strong>
+                <span>Mức thoải mái hơn, gồm phần tối thiểu cộng thêm giải trí, mua sắm hoặc nâng chất lượng sống.</span>
+              </div>
+            </div>
+          </div>
+
+          <form class="onboarding-panel" data-form="onboarding">
+            <div class="panel-header">
+              <div>
+                <h2>Ngân sách tháng này</h2>
+                <p>${escapeHtml(new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${currentMonth()}-01T12:00:00`)))}</p>
+              </div>
+            </div>
+            <div class="onboarding-body">
+              <div class="onboarding-settings">
+                <div class="field">
+                  <label for="onboarding-income">Thu nhập tháng</label>
+                  <input id="onboarding-income" name="monthly_income" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(draft.monthlyIncome)}" placeholder="0" required>
+                </div>
+                <div class="field">
+                  <label for="onboarding-currency">Đơn vị tiền</label>
+                  <select id="onboarding-currency" name="currency" data-onboarding-currency>
+                    ${Object.entries(currencyOptions).map(([code, option]) => `
+                      <option value="${escapeAttr(code)}" ${code === draft.currency ? "selected" : ""}>${escapeHtml(option.label)}</option>
+                    `).join("")}
+                  </select>
+                </div>
+              </div>
+              <div class="onboarding-estimates" data-onboarding-estimates>
+                ${renderOnboardingEstimates(draft, formatter)}
+              </div>
+              <div class="onboarding-lists">
+                <section class="onboarding-list">
+                  <div class="onboarding-list-header">
+                    <h3>Gợi ý</h3>
+                    <span>${recommendations.length} danh mục</span>
+                  </div>
+                  <div class="onboarding-recommendations">
+                    ${recommendations.length ? recommendations.map((category) => `
+                      <button class="onboarding-recommendation" type="button" data-action="add-onboarding-recommendation" data-category="${escapeAttr(category)}">
+                        <span>${escapeHtml(categoryLabel(category))}</span>
+                        <strong>Thêm</strong>
+                      </button>
+                    `).join("") : `<p class="empty-state">Đã thêm hết danh mục gợi ý.</p>`}
+                    ${draft.customCategoryOpen ? `
+                      <div class="onboarding-custom-inline">
+                        <input data-onboarding-custom type="text" maxlength="60" value="${escapeAttr(draft.customCategory)}" placeholder="Tên danh mục" autofocus>
+                        <button class="icon-button primary" type="button" data-action="add-onboarding-custom" title="Thêm danh mục">
+                          ${svgIcon("plus")}
+                        </button>
+                      </div>
+                    ` : `
+                      <button class="onboarding-add-custom" type="button" data-action="open-onboarding-custom" title="Thêm danh mục riêng">
+                        ${svgIcon("plus")}
+                      </button>
+                    `}
+                  </div>
+                </section>
+
+                <section class="onboarding-list">
+                  <div class="onboarding-list-header">
+                    <h3>Danh sách của bạn</h3>
+                    <span>${draft.rows.length} danh mục</span>
+                  </div>
+                  <div class="onboarding-budget-head" aria-hidden="true">
+                    <span>Danh mục</span>
+                    <span>Chi tiêu tối thiểu</span>
+                    <span>Chi tiêu đầy đủ</span>
+                    <span></span>
+                  </div>
+                  <div class="onboarding-budget-list">
+                    ${onboardingBudgetRows(draft.rows, currency)}
+                  </div>
+                  ${draft.rows.length ? "" : `<p class="empty-state">Chọn danh mục gợi ý hoặc thêm danh mục riêng.</p>`}
+                </section>
+              </div>
+              <div class="form-actions">
+                ${auth.user?.onboarding_completed ? `<button class="button secondary" type="button" data-action="cancel-onboarding">Hủy</button>` : ""}
+                <button class="button" type="submit">Lưu thiết lập</button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </main>
+    `;
+  }
+
+  function onboardingBudgetRows(rows, currency) {
+    const formatter = formatterForCurrency(currency);
+    return rows.map((row, index) => {
+      const isEditing = row.editing !== false;
+      return `
+        <div class="onboarding-budget-row ${isEditing ? "editing" : ""}" data-onboarding-category="${escapeAttr(row.category)}" data-onboarding-minimum-value="${escapeAttr(row.minimum)}" data-onboarding-full-value="${escapeAttr(row.full)}" data-onboarding-row-index="${index}" data-onboarding-editing="${isEditing ? "true" : "false"}">
+          ${isEditing ? `
+            <div class="onboarding-row-main">
+              <label class="onboarding-edit-field">
+                <span>Danh mục</span>
+                <input data-onboarding-row-category name="category_${index}" type="text" maxlength="60" value="${escapeAttr(row.category)}" placeholder="Tên danh mục" required>
+              </label>
+              <label class="onboarding-edit-field">
+                <span>Chi tiêu tối thiểu</span>
+                <input data-onboarding-minimum name="minimum_amount_${index}" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(row.minimum)}" placeholder="0" required>
+              </label>
+              <label class="onboarding-edit-field">
+                <span>Chi tiêu đầy đủ</span>
+                <input data-onboarding-full name="full_amount_${index}" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(row.full)}" placeholder="0" required>
+              </label>
+            </div>
+            <div class="onboarding-row-actions">
+              <button class="icon-button primary" type="button" data-action="finish-onboarding-row-edit" data-row-index="${index}" title="Xong">
+                ${svgIcon("check")}
+              </button>
+              <button class="icon-button danger" type="button" data-action="remove-onboarding-category" data-row-index="${index}" title="Xóa">
+                ${svgIcon("trash")}
+              </button>
+            </div>
+          ` : `
+            <div class="onboarding-row-main">
+              <div class="onboarding-value">
+                <span>Danh mục</span>
+                <strong>${escapeHtml(categoryLabel(row.category))}</strong>
+              </div>
+              <div class="onboarding-value">
+                <span>Chi tiêu tối thiểu</span>
+                <strong>${escapeHtml(formatOnboardingAmount(row.minimum, formatter))}</strong>
+              </div>
+              <div class="onboarding-value">
+                <span>Chi tiêu đầy đủ</span>
+                <strong>${escapeHtml(formatOnboardingAmount(row.full, formatter))}</strong>
+              </div>
+            </div>
+            <div class="onboarding-row-actions">
+              <button class="icon-button" type="button" data-action="edit-onboarding-row" data-row-index="${index}" title="Sửa">
+                ${svgIcon("edit")}
+              </button>
+              <button class="icon-button danger" type="button" data-action="remove-onboarding-category" data-row-index="${index}" title="Xóa">
+                ${svgIcon("trash")}
+              </button>
+            </div>
+          `}
+        </div>
+      `;
+    }).join("");
+  }
+
+  function formatterForCurrency(currency) {
+    return new Intl.NumberFormat(currency.locale, {
+      style: "currency",
+      currency: currency.currency,
+      maximumFractionDigits: currency.fractionDigits
+    });
+  }
+
+  function formatOnboardingAmount(value, formatter) {
+    const amount = Number(value || 0);
+    return Number.isFinite(amount) && amount > 0 ? formatter.format(amount) : "Chưa nhập";
+  }
+
+  function renderOnboardingEstimates(draft, formatter) {
+    const monthlyIncome = Number(draft.monthlyIncome || 0);
+    const minimumBudget = draft.rows.reduce((sum, row) => sum + Number(row.minimum || 0), 0);
+    const fullBudget = draft.rows.reduce((sum, row) => sum + Number(row.full || 0), 0);
+    return `
+      ${onboardingEstimateCard("Độc lập tài chính", "25 năm Chi tiêu tối thiểu", financialFreedomEstimate(monthlyIncome, minimumBudget), formatter)}
+      ${onboardingEstimateCard("Tự do tài chính", "25 năm Chi tiêu đầy đủ", financialFreedomEstimate(monthlyIncome, fullBudget), formatter)}
+    `;
+  }
+
+  function onboardingEstimateCard(title, subtitle, estimate, formatter) {
+    return `
+      <article class="onboarding-estimate-card">
+        <div>
+          <span>${escapeHtml(subtitle)}</span>
+          <strong>${escapeHtml(title)}</strong>
+        </div>
+        <div class="onboarding-estimate-time">${escapeHtml(formatFreedomTime(estimate))}</div>
+        <small>Mục tiêu ${formatter.format(estimate.target)} · Tiết kiệm ${formatter.format(estimate.monthlySavings)}/tháng</small>
+      </article>
+    `;
+  }
+
+  function updateOnboardingEstimates() {
+    const target = document.querySelector("[data-onboarding-estimates]");
+    if (!target) return;
+
+    const draft = ensureOnboardingDraft();
+    const formatter = formatterForCurrency(currencyByCode(draft.currency));
+    target.innerHTML = renderOnboardingEstimates(draft, formatter);
+  }
+
+  function ensureOnboardingDraft() {
+    if (!onboardingDraft) {
+      onboardingDraft = {
+        monthlyIncome: "",
+        currency: auth.user?.currency || "VND",
+        customCategory: "",
+        customCategoryOpen: false,
+        rows: []
+      };
+    }
+    return onboardingDraft;
+  }
+
+  function syncOnboardingDraftFromDom() {
+    const draft = ensureOnboardingDraft();
+    const form = document.querySelector("[data-form='onboarding']");
+    if (!form) return draft;
+
+    const formData = new FormData(form);
+    draft.monthlyIncome = String(formData.get("monthly_income") || "");
+    draft.currency = currencyOptions[formData.get("currency")] ? String(formData.get("currency")) : "VND";
+    draft.customCategory = String(form.querySelector("[data-onboarding-custom]")?.value || "").trim();
+    draft.rows = [...form.querySelectorAll("[data-onboarding-category]")].map((row) => {
+      return {
+        category: localizeCategoryName(row.querySelector("[data-onboarding-row-category]")?.value || row.dataset.onboardingCategory),
+        minimum: String(row.querySelector("[data-onboarding-minimum]")?.value || row.dataset.onboardingMinimumValue || ""),
+        full: String(row.querySelector("[data-onboarding-full]")?.value || row.dataset.onboardingFullValue || ""),
+        editing: row.dataset.onboardingEditing !== "false"
+      };
+    }).filter((row) => row.category);
+    return draft;
+  }
+
+  function hasDuplicateOnboardingCategories(rows) {
+    const seen = new Set();
+    return rows.some((row) => {
+      const key = row.category.toLowerCase();
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
+    });
+  }
+
+  function finishOnboardingRowEdit(index) {
+    const draft = syncOnboardingDraftFromDom();
+    const row = draft.rows[index];
+    if (!row?.category) {
+      showToast("Hãy nhập tên danh mục.");
+      return false;
+    }
+    if (hasDuplicateOnboardingCategories(draft.rows)) {
+      showToast("Danh mục này đã có trong danh sách của bạn.");
+      return false;
+    }
+    row.editing = false;
+    return true;
+  }
+
+  function addOnboardingCategory(category) {
+    const draft = ensureOnboardingDraft();
+    const name = localizeCategoryName(category).slice(0, 60);
+    if (!name) {
+      showToast("Hãy nhập tên danh mục.");
+      return false;
+    }
+    if (draft.rows.some((row) => row.category.toLowerCase() === name.toLowerCase())) {
+      showToast("Danh mục này đã có trong danh sách của bạn.");
+      return false;
+    }
+    draft.rows.push({ category: name, minimum: "", full: "", editing: true });
+    return true;
+  }
+
   function moduleButton(module) {
     return `
       <button class="module-button ${module.id === activeModuleId ? "active" : ""}"
@@ -637,6 +938,7 @@
       ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
 
       ${moneyMetrics(data, dollars)}
+      ${financialFreedomEstimates(data, precise)}
       ${renderBudgetTab(data, precise)}
     `;
   }
@@ -687,6 +989,43 @@
         </article>
       </section>
     `;
+  }
+
+  function financialFreedomEstimates(data, formatter) {
+    return `
+      <section class="freedom-grid" aria-label="Ước tính tự do tài chính">
+        ${freedomEstimateCard("Độc lập tài chính", "25 năm Chi tiêu tối thiểu", data.minimumFreedom, formatter)}
+        ${freedomEstimateCard("Tự do tài chính", "25 năm Chi tiêu đầy đủ", data.fullFreedom, formatter)}
+      </section>
+    `;
+  }
+
+  function freedomEstimateCard(title, subtitle, estimate, formatter) {
+    return `
+      <article class="freedom-card">
+        <div>
+          <span>${escapeHtml(subtitle)}</span>
+          <strong>${escapeHtml(title)}</strong>
+        </div>
+        <div class="freedom-time">${escapeHtml(formatFreedomTime(estimate))}</div>
+        <div class="freedom-meta">
+          <span>Mục tiêu ${formatter.format(estimate.target)}</span>
+          <span>Tiết kiệm ${formatter.format(estimate.monthlySavings)}/tháng</span>
+        </div>
+      </article>
+    `;
+  }
+
+  function formatFreedomTime(estimate) {
+    if (estimate.monthlyBudget <= 0) return "Cần thiết lập ngân sách";
+    if (estimate.monthlyIncome <= 0) return "Cần nhập thu nhập";
+    if (estimate.monthlySavings <= 0) return "Chưa có thặng dư";
+
+    const years = Math.floor(estimate.months / 12);
+    const months = estimate.months % 12;
+    if (!years) return `${months} tháng`;
+    if (!months) return `${years} năm`;
+    return `${years} năm ${months} tháng`;
   }
 
   function renderBudgetTab(data, formatter) {
@@ -835,6 +1174,7 @@
 
   function renderProfile() {
     const user = auth.user || {};
+    const formatter = preciseMoneyFormatter();
     const createdLabel = user.created_at
       ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(new Date(user.created_at))
       : "Chưa rõ";
@@ -867,6 +1207,10 @@
               <strong>${escapeHtml(activeCurrency().label)}</strong>
             </div>
             <div>
+              <span>Thu nhập tháng</span>
+              <strong>${formatter.format(Number(user.monthly_income || 0))}</strong>
+            </div>
+            <div>
               <span>Ngày tạo</span>
               <strong>${escapeHtml(createdLabel)}</strong>
             </div>
@@ -879,6 +1223,7 @@
             <span>API URL</span>
             <strong>${escapeHtml(apiBaseUrl())}</strong>
           </div>
+          <button class="button secondary" type="button" data-action="start-onboarding">Thiết lập ngân sách lại</button>
         </article>
 
         <article class="panel">
@@ -1104,6 +1449,8 @@
           id: budget.id,
           category: budget.category,
           limit: budget.limit,
+          minimum: budget.minimum,
+          full: budget.full,
           spent,
           percent: hasSyncedProgress ? budget.percent : budget.limit > 0 ? Math.round((spent / budget.limit) * 100) : 0,
           color: normalizeBudgetColor(budget.color)
@@ -1113,6 +1460,9 @@
     const totalLimit = budgetProgress.reduce((sum, budget) => sum + Number(budget.limit || 0), 0);
     const remainingBudget = totalLimit - expenses;
     const overBudgetCount = budgetProgress.filter((budget) => Number(budget.percent || 0) >= 100).length;
+    const monthlyIncome = Number(auth.user?.monthly_income || 0);
+    const minimumMonthlyBudget = budgetProgress.reduce((sum, budget) => sum + Number(budget.minimum || budget.limit || 0), 0);
+    const fullMonthlyBudget = budgetProgress.reduce((sum, budget) => sum + Number(budget.full || budget.limit || 0), 0);
 
     return {
       selectedLabel: new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${selectedMonth}-01T12:00:00`)),
@@ -1123,7 +1473,23 @@
       overBudgetCount,
       expenseCount: selectedMonthTransactions.length,
       categorySpend,
-      budgetProgress
+      budgetProgress,
+      minimumFreedom: financialFreedomEstimate(monthlyIncome, minimumMonthlyBudget),
+      fullFreedom: financialFreedomEstimate(monthlyIncome, fullMonthlyBudget)
+    };
+  }
+
+  function financialFreedomEstimate(monthlyIncome, monthlyBudget) {
+    const safeIncome = Math.max(0, Number(monthlyIncome || 0));
+    const safeBudget = Math.max(0, Number(monthlyBudget || 0));
+    const monthlySavings = safeIncome - safeBudget;
+    const target = safeBudget * 12 * 25;
+    return {
+      monthlyIncome: safeIncome,
+      monthlyBudget: safeBudget,
+      monthlySavings,
+      target,
+      months: monthlySavings > 0 && target > 0 ? Math.ceil(target / monthlySavings) : 0
     };
   }
 
@@ -1217,6 +1583,8 @@
       category: budget.category,
       month: budget.month,
       limit_amount: budget.limit_amount,
+      minimum_amount: budget.minimum_amount,
+      full_amount: budget.full_amount,
       color: budget.color,
       spent_amount: budget.spent_amount,
       percent_used: budget.percent_used
@@ -1494,6 +1862,7 @@
           <span></span>
         </div>
         <small>${formatter.format(item.spent)} / ${formatter.format(item.limit)}</small>
+        <small>Tối thiểu ${formatter.format(item.minimum || item.limit)} · Đầy đủ ${formatter.format(item.full || item.limit)}</small>
         ${isEditing ? budgetEditForm(item, color) : budgetCardActions(item)}
       </div>
     `;
@@ -1553,6 +1922,58 @@
       app();
     }
 
+    if (action === "start-onboarding") {
+      onboardingDraft = null;
+      onboardingActive = true;
+      app();
+    }
+
+    if (action === "cancel-onboarding") {
+      onboardingActive = false;
+      onboardingDraft = null;
+      app();
+    }
+
+    if (action === "add-onboarding-recommendation") {
+      syncOnboardingDraftFromDom();
+      if (addOnboardingCategory(actionTarget.dataset.category)) app();
+    }
+
+    if (action === "open-onboarding-custom") {
+      const draft = syncOnboardingDraftFromDom();
+      draft.customCategoryOpen = true;
+      app();
+    }
+
+    if (action === "add-onboarding-custom") {
+      const draft = syncOnboardingDraftFromDom();
+      if (addOnboardingCategory(draft.customCategory)) {
+        draft.customCategory = "";
+        draft.customCategoryOpen = false;
+        app();
+      }
+    }
+
+    if (action === "edit-onboarding-row") {
+      const draft = syncOnboardingDraftFromDom();
+      const index = Number(actionTarget.dataset.rowIndex);
+      if (draft.rows[index]) {
+        draft.rows[index].editing = true;
+        app();
+      }
+    }
+
+    if (action === "finish-onboarding-row-edit") {
+      if (finishOnboardingRowEdit(Number(actionTarget.dataset.rowIndex))) app();
+    }
+
+    if (action === "remove-onboarding-category") {
+      const draft = syncOnboardingDraftFromDom();
+      const index = Number(actionTarget.dataset.rowIndex);
+      draft.rows = draft.rows.filter((_, rowIndex) => rowIndex !== index);
+      app();
+    }
+
     if (action === "previous-month" || action === "next-month") {
       state.money.filters.month = shiftMonth(
         state.money.filters.month || currentMonth(),
@@ -1581,6 +2002,8 @@
       localStorage.removeItem(AUTH_STORAGE_KEY);
       editingId = null;
       editingBudgetId = null;
+      onboardingDraft = null;
+      onboardingActive = false;
       app();
       showToast("Đã đăng xuất.");
     }
@@ -1647,6 +2070,32 @@
       state.money.filters.search = event.target.value;
       saveState();
     }
+
+    if (event.target.closest("[data-form='onboarding']")) {
+      syncOnboardingDraftFromDom();
+      updateOnboardingEstimates();
+    }
+  }
+
+  function handleKeydown(event) {
+    if (event.key !== "Enter") return;
+
+    if (event.target.matches("[data-onboarding-custom]")) {
+      event.preventDefault();
+      const draft = syncOnboardingDraftFromDom();
+      if (addOnboardingCategory(draft.customCategory)) {
+        draft.customCategory = "";
+        draft.customCategoryOpen = false;
+        app();
+      }
+      return;
+    }
+
+    const row = event.target.closest("[data-onboarding-row-index]");
+    if (row && row.dataset.onboardingEditing === "true") {
+      event.preventDefault();
+      if (finishOnboardingRowEdit(Number(row.dataset.onboardingRowIndex))) app();
+    }
   }
 
   async function handleChange(event) {
@@ -1662,6 +2111,11 @@
       renderActiveModule();
       ensureMoneyLoaded();
       ensureFriendsLoaded();
+    }
+
+    if (event.target.matches("[data-onboarding-currency]")) {
+      syncOnboardingDraftFromDom();
+      app();
     }
 
     if (event.target.matches("[data-category-name]")) {
@@ -1680,6 +2134,13 @@
     if (authForm) {
       event.preventDefault();
       await submitAuth(authForm);
+      return;
+    }
+
+    const onboardingForm = event.target.closest("[data-form='onboarding']");
+    if (onboardingForm) {
+      event.preventDefault();
+      await saveOnboarding(onboardingForm);
       return;
     }
 
@@ -1864,6 +2325,75 @@
     } catch (error) {
       showToast(error.message || "Không thể đổi mật khẩu.");
     }
+  }
+
+  async function saveOnboarding(form) {
+    const draft = syncOnboardingDraftFromDom();
+    const monthlyIncome = Number(draft.monthlyIncome || 0);
+    const currency = currencyOptions[draft.currency] ? draft.currency : "VND";
+    const rows = draft.rows.map((row) => ({
+      category: localizeCategoryName(row.category),
+      minimum: Number(row.minimum || 0),
+      full: Number(row.full || 0)
+    })).filter((row) => row.category);
+
+    if (!Number.isFinite(monthlyIncome) || rows.some((row) => !Number.isFinite(row.minimum) || !Number.isFinite(row.full))) {
+      showToast("Hãy nhập số tiền hợp lệ.");
+      return;
+    }
+
+    if (monthlyIncome < 0 || rows.some((row) => row.minimum < 0 || row.full < 0)) {
+      showToast("Các số tiền không được nhỏ hơn 0.");
+      return;
+    }
+
+    try {
+      const month = state.money.filters.month || currentMonth();
+      await ensureBudgetCategories(rows.map((row) => row.category));
+      await Promise.all(rows.map((row, index) => (
+        apiRequest("/api/money/budgets", {
+          method: "PUT",
+          body: {
+            category: row.category,
+            month,
+            limit_amount: String(row.full),
+            minimum_amount: String(row.minimum),
+            full_amount: String(row.full),
+            color: budgetColors[index % budgetColors.length]
+          }
+        })
+      )));
+      await apiRequest("/api/auth/me", {
+        method: "PATCH",
+        body: { currency }
+      });
+      auth.user = normalizeUser(await apiRequest("/api/auth/onboarding", {
+        method: "PATCH",
+        body: { monthly_income: String(monthlyIncome) }
+      }));
+      onboardingActive = false;
+      onboardingDraft = null;
+      moneySync.loaded = false;
+      moneySync.budgetMonth = "";
+      saveAuth();
+      app();
+      showToast("Đã lưu thiết lập ban đầu.");
+    } catch (error) {
+      showToast(error.message || "Không thể lưu thiết lập ban đầu.");
+    }
+  }
+
+  async function ensureBudgetCategories(categories) {
+    const records = await loadCategoriesFromApi();
+    const knownNames = new Set(records.map((record) => localizeCategoryName(record.name)));
+    await Promise.all(categories.filter((category) => !knownNames.has(category)).map((category) => (
+      apiRequest("/api/money/categories", {
+        method: "POST",
+        body: { name: category }
+      }).catch((error) => {
+        if (!String(error.message || "").includes("tồn tại")) throw error;
+      })
+    )));
   }
 
   async function apiRequest(path, options = {}) {

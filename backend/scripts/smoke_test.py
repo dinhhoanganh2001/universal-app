@@ -40,17 +40,34 @@ def main() -> None:
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200, me.text
     assert me.json()["currency"] == "VND", me.text
+    assert me.json()["monthly_income"] == "0.00", me.text
+    assert me.json()["onboarding_completed"] is False, me.text
     demo_user_id = me.json()["id"]
 
     profile = client.patch(
         "/api/auth/me",
         headers=headers,
-        json={"full_name": "Demo Updated", "avatar_url": "https://example.com/avatar.png", "currency": "USD"},
+        json={
+            "full_name": "Demo Updated",
+            "avatar_url": "https://example.com/avatar.png",
+            "currency": "USD",
+            "monthly_income": "1200.00",
+        },
     )
     assert profile.status_code == 200, profile.text
     assert profile.json()["full_name"] == "Demo Updated", profile.text
     assert profile.json()["avatar_url"] == "https://example.com/avatar.png", profile.text
     assert profile.json()["currency"] == "USD", profile.text
+    assert profile.json()["monthly_income"] == "1200.00", profile.text
+
+    onboarding = client.patch(
+        "/api/auth/onboarding",
+        headers=headers,
+        json={"monthly_income": "2500.00"},
+    )
+    assert onboarding.status_code == 200, onboarding.text
+    assert onboarding.json()["monthly_income"] == "2500.00", onboarding.text
+    assert onboarding.json()["onboarding_completed"] is True, onboarding.text
 
     password_update = client.patch(
         "/api/auth/password",
@@ -211,10 +228,19 @@ def main() -> None:
     budget = client.put(
         "/api/money/budgets",
         headers=headers,
-        json={"category": "Food", "month": "2026-07", "limit_amount": "500.00", "color": "#0f766e"},
+        json={
+            "category": "Food",
+            "month": "2026-07",
+            "limit_amount": "500.00",
+            "minimum_amount": "300.00",
+            "full_amount": "500.00",
+            "color": "#0f766e",
+        },
     )
     assert budget.status_code == 200, budget.text
     assert budget.json()["spent_amount"] == "42.50", budget.text
+    assert budget.json()["minimum_amount"] == "300.00", budget.text
+    assert budget.json()["full_amount"] == "500.00", budget.text
     assert budget.json()["color"] == "#0f766e", budget.text
     budget_id = budget.json()["id"]
 

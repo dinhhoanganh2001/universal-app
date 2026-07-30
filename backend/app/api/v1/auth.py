@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import PasswordUpdate, Token, UserCreate, UserLogin, UserProfileUpdate, UserRead
+from app.schemas.auth import OnboardingUpdate, PasswordUpdate, Token, UserCreate, UserLogin, UserProfileUpdate, UserRead
 from app.api.deps import get_current_user
 
 
@@ -80,3 +80,17 @@ def update_password(
     current_user.hashed_password = hash_password(payload.new_password)
     db.add(current_user)
     db.commit()
+
+
+@router.patch("/onboarding", response_model=UserRead)
+def complete_onboarding(
+    payload: OnboardingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    current_user.monthly_income = payload.monthly_income
+    current_user.onboarding_completed = True
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
