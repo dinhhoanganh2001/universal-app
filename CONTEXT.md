@@ -18,6 +18,7 @@ This file is the shared working context for contributors and coding agents. Read
 - Money backend APIs exist for expense transactions, budgets, and monthly summaries.
 - Money category APIs exist for user-defined category names.
 - The frontend login/register screen talks to the backend auth endpoints.
+- The app UI does not expose the API URL; API base configuration comes from generated `src/runtime-config.js`, a previously stored value, or the local default.
 - After login, the frontend money tracker syncs transactions and budgets with the backend.
 - The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
@@ -180,3 +181,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Reordered onboarding default/recommended categories to put costly categories first and kept `Tiết kiệm` out of the default/recommendation list, including legacy normalization.
 - Added frontend recovery for stale/invalid auth tokens so users are sent back to login automatically instead of needing DevTools/localStorage cleanup.
 - Improved stale-token recovery by validating the saved token before onboarding renders and preserving in-progress onboarding drafts when a session expires during save.
+- Hid API URL from login/register and profile UI while keeping runtime-config based API resolution.

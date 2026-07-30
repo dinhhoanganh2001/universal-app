@@ -1305,8 +1305,7 @@ tbody tr:hover {
   gap: 10px;
 }
 
-.profile-facts div,
-.profile-api {
+.profile-facts div {
   display: grid;
   gap: 4px;
   padding: 12px;
@@ -1315,15 +1314,13 @@ tbody tr:hover {
   background: linear-gradient(135deg, #f8fafc, #f0fdfa);
 }
 
-.profile-facts span,
-.profile-api span {
+.profile-facts span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
 }
 
-.profile-facts strong,
-.profile-api strong {
+.profile-facts strong {
   overflow-wrap: anywhere;
 }
 

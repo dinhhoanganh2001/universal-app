@@ -403,13 +403,6 @@
     return runtimeApiBaseUrl() || localStorage.getItem(API_BASE_STORAGE_KEY) || DEFAULT_API_BASE_URL;
   }
 
-  function setApiBaseUrl(value) {
-    if (runtimeApiBaseUrl()) return;
-
-    const normalized = String(value || "").trim().replace(/\/+$/, "");
-    localStorage.setItem(API_BASE_STORAGE_KEY, normalized || DEFAULT_API_BASE_URL);
-  }
-
   function runtimeApiBaseUrl() {
     return String(window.UNIVERSAL_APP_CONFIG?.API_BASE_URL || "").trim().replace(/\/+$/, "");
   }
@@ -651,10 +644,6 @@
               <div class="field">
                 <label for="auth-password">Mật khẩu</label>
                 <input id="auth-password" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" minlength="8" placeholder="Tối thiểu 8 ký tự" required>
-              </div>
-              <div class="field">
-                <label for="auth-api">API URL</label>
-                <input id="auth-api" name="api_base_url" type="url" value="${escapeAttr(apiBaseUrl())}" required>
               </div>
               <button class="button" type="submit">${isRegister ? "Tạo tài khoản" : "Đăng nhập"}</button>
             </form>
@@ -1266,10 +1255,6 @@
               <span>Phiên đăng nhập</span>
               <strong>30 ngày</strong>
             </div>
-          </div>
-          <div class="profile-api">
-            <span>API URL</span>
-            <strong>${escapeHtml(apiBaseUrl())}</strong>
           </div>
           <button class="button secondary" type="button" data-action="start-onboarding">Thiết lập ngân sách lại</button>
         </article>
@@ -2287,12 +2272,9 @@
   async function submitAuth(form) {
     const formData = new FormData(form);
     const mode = form.dataset.form;
-    const apiUrl = String(formData.get("api_base_url") || DEFAULT_API_BASE_URL);
     const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "");
     const fullName = String(formData.get("full_name") || "").trim();
-
-    setApiBaseUrl(apiUrl);
 
     if (!email || !password || (mode === "register" && !fullName)) {
       showToast("Hãy nhập đầy đủ thông tin.");
