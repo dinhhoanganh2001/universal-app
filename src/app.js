@@ -1,6 +1,7 @@
 (function () {
   const STORAGE_KEY = "universal-app-state-v2";
   const AUTH_STORAGE_KEY = "universal-app-auth-v1";
+  const ONBOARDING_DRAFT_STORAGE_KEY = "universal-app-onboarding-draft-v1";
   const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
   const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -347,6 +348,40 @@
 
   function saveAuth() {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  }
+
+  function loadOnboardingDraft() {
+    const stored = localStorage.getItem(ONBOARDING_DRAFT_STORAGE_KEY);
+    if (!stored) return null;
+
+    try {
+      const parsed = JSON.parse(stored);
+      const rows = Array.isArray(parsed.rows) ? parsed.rows.map((row) => ({
+        category: localizeCategoryName(row.category),
+        minimum: String(row.minimum || ""),
+        full: String(row.full || ""),
+        editing: row.editing !== false
+      })).filter((row) => row.category) : [];
+      return {
+        monthlyIncome: String(parsed.monthlyIncome || ""),
+        currency: currencyOptions[parsed.currency] ? parsed.currency : auth.user?.currency || "VND",
+        customCategory: String(parsed.customCategory || ""),
+        customCategoryOpen: Boolean(parsed.customCategoryOpen),
+        rows
+      };
+    } catch (error) {
+      console.warn("Unable to parse onboarding draft.", error);
+      return null;
+    }
+  }
+
+  function saveOnboardingDraft() {
+    if (!onboardingDraft) return;
+    localStorage.setItem(ONBOARDING_DRAFT_STORAGE_KEY, JSON.stringify(onboardingDraft));
+  }
+
+  function clearOnboardingDraft() {
+    localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY);
   }
 
   function normalizeUser(user) {
@@ -844,7 +879,7 @@
 
   function ensureOnboardingDraft() {
     if (!onboardingDraft) {
-      onboardingDraft = {
+      onboardingDraft = loadOnboardingDraft() || {
         monthlyIncome: "",
         currency: auth.user?.currency || "VND",
         customCategory: "",
@@ -872,6 +907,7 @@
         editing: row.dataset.onboardingEditing !== "false"
       };
     }).filter((row) => row.category);
+    saveOnboardingDraft();
     return draft;
   }
 
@@ -912,6 +948,7 @@
       return false;
     }
     draft.rows.push({ category: name, minimum: "", full: "", editing: true });
+    saveOnboardingDraft();
     return true;
   }
 
@@ -1641,13 +1678,7 @@
       saveState();
     } catch (error) {
       moneySync.error = error.message || "Không thể đồng bộ dữ liệu.";
-      if (String(error.message || "").includes("authentication")) {
-        auth.token = "";
-        auth.user = null;
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        app();
-        return;
-      }
+      if (error.authExpired) return;
     } finally {
       moneySync.loading = false;
       if (auth.token && document.querySelector("#main")) {
@@ -1939,6 +1970,7 @@
 
     if (action === "start-onboarding") {
       onboardingDraft = null;
+      clearOnboardingDraft();
       onboardingActive = true;
       app();
     }
@@ -1946,6 +1978,7 @@
     if (action === "cancel-onboarding") {
       onboardingActive = false;
       onboardingDraft = null;
+      clearOnboardingDraft();
       app();
     }
 
@@ -1978,6 +2011,7 @@
       const index = Number(actionTarget.dataset.rowIndex);
       if (draft.rows[index]) {
         draft.rows[index].editing = true;
+        saveOnboardingDraft();
         app();
       }
     }
@@ -1990,6 +2024,7 @@
       const draft = syncOnboardingDraftFromDom();
       const index = Number(actionTarget.dataset.rowIndex);
       draft.rows = draft.rows.filter((_, rowIndex) => rowIndex !== index);
+      saveOnboardingDraft();
       app();
     }
 
@@ -2023,6 +2058,7 @@
       editingBudgetId = null;
       onboardingDraft = null;
       onboardingActive = false;
+      clearOnboardingDraft();
       app();
       showToast("Đã đăng xuất.");
     }
@@ -2277,6 +2313,10 @@
       });
       auth.token = token.access_token;
       auth.user = normalizeUser(await apiRequest("/api/auth/me", { token: auth.token }));
+      if (!auth.user?.onboarding_completed && loadOnboardingDraft()) {
+        onboardingActive = true;
+        onboardingDraft = null;
+      }
       moneySync.loaded = false;
       moneySync.budgetMonth = "";
       moneySync.error = "";
@@ -2285,6 +2325,27 @@
       showToast(mode === "register" ? "Tạo tài khoản thành công." : "Đăng nhập thành công.");
     } catch (error) {
       showToast(error.message || "Không thể kết nối API.");
+    }
+  }
+
+  async function validateStoredAuth() {
+    if (!auth.token) {
+      app();
+      return;
+    }
+
+    try {
+      auth.user = normalizeUser(await apiRequest("/api/auth/me", { token: auth.token }));
+      if (!auth.user?.onboarding_completed && loadOnboardingDraft()) {
+        onboardingActive = true;
+        onboardingDraft = null;
+      }
+      saveAuth();
+      app();
+    } catch (error) {
+      if (error.authExpired) return;
+      app();
+      showToast(error.message || "Không thể kiểm tra phiên đăng nhập.");
     }
   }
 
@@ -2392,12 +2453,14 @@
       }));
       onboardingActive = false;
       onboardingDraft = null;
+      clearOnboardingDraft();
       moneySync.loaded = false;
       moneySync.budgetMonth = "";
       saveAuth();
       app();
       showToast("Đã lưu thiết lập ban đầu.");
     } catch (error) {
+      if (error.authExpired) return;
       showToast(error.message || "Không thể lưu thiết lập ban đầu.");
     }
   }
@@ -2410,12 +2473,14 @@
       }));
       onboardingActive = false;
       onboardingDraft = null;
+      clearOnboardingDraft();
       moneySync.loaded = false;
       moneySync.budgetMonth = "";
       saveAuth();
       app();
       showToast("Bạn có thể thiết lập ngân sách sau trong Hồ sơ.");
     } catch (error) {
+      if (error.authExpired) return;
       showToast(error.message || "Không thể bỏ qua thiết lập ban đầu.");
     }
   }
@@ -2451,11 +2516,40 @@
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 401 && isInvalidAuthDetail(payload.detail)) {
+        handleAuthExpired();
+        const error = new Error("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
+        error.authExpired = true;
+        throw error;
+      }
       throw new Error(apiErrorMessage(payload.detail, response.status));
     }
 
     if (response.status === 204) return null;
     return response.json();
+  }
+
+  function isInvalidAuthDetail(detail) {
+    return detail === "Invalid authentication credentials" || detail === "Not authenticated";
+  }
+
+  function handleAuthExpired() {
+    if (onboardingActive || document.querySelector("[data-form='onboarding']")) {
+      syncOnboardingDraftFromDom();
+    }
+    const hasDraft = Boolean(loadOnboardingDraft());
+    auth.token = "";
+    auth.user = null;
+    onboardingActive = false;
+    onboardingDraft = null;
+    moneySync.loaded = false;
+    moneySync.loading = false;
+    moneySync.budgetMonth = "";
+    friendsSync.loaded = false;
+    friendsSync.loading = false;
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    app();
+    showToast(hasDraft ? "Phiên đăng nhập đã hết hạn. Đã giữ lại thiết lập đang nhập, hãy đăng nhập lại." : "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
   }
 
   function apiErrorMessage(detail, status) {
@@ -2796,5 +2890,5 @@
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }
 
-  app();
+  validateStoredAuth();
 })();

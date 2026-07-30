@@ -13,6 +13,7 @@ This file is the shared working context for contributors and coding agents. Read
 - The backend is a FastAPI app under `backend/`.
 - Authentication exists with register/login/me endpoints, profile update, password change, and JWT bearer tokens.
 - JWT sessions default to 30 days through `ACCESS_TOKEN_EXPIRE_MINUTES=43200`.
+- The frontend validates saved auth tokens before showing onboarding, automatically clears stale/invalid tokens, and returns users to the login screen with a Vietnamese message when the backend returns invalid authentication credentials. If this happens while a user is editing onboarding, the draft is preserved locally and restored after the next login.
 - Friend APIs use pending requests: adding by email/id creates a request, the other user must accept, and accepted friends show only aggregate budget progress percentages.
 - Money backend APIs exist for expense transactions, budgets, and monthly summaries.
 - Money category APIs exist for user-defined category names.
@@ -177,3 +178,5 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Widened the onboarding setup panel, reduced and tightened the left explanation column so it fits in one desktop viewport, narrowed the recommendation list, and added live onboarding estimate cards for `Độc lập tài chính` and `Tự do tài chính`.
 - Added `Thiết lập sau` to onboarding so users can enter the app without creating initial budgets, and updated default/recommended categories to exclude income-related items while adding `Dating` and `Gửi bố mẹ`.
 - Reordered onboarding default/recommended categories to put costly categories first and kept `Tiết kiệm` out of the default/recommendation list, including legacy normalization.
+- Added frontend recovery for stale/invalid auth tokens so users are sent back to login automatically instead of needing DevTools/localStorage cleanup.
+- Improved stale-token recovery by validating the saved token before onboarding renders and preserving in-progress onboarding drafts when a session expires during save.
