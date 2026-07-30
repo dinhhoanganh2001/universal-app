@@ -49,22 +49,37 @@ def list_friends(
         )
     )
 
+    accepted_friends = []
+    seen_friend_ids = set()
+    for row in rows:
+        friend_user = other_friend_user(db, row, current_user.id)
+        if friend_user.id in seen_friend_ids:
+            continue
+        seen_friend_ids.add(friend_user.id)
+        accepted_friends.append(friend_read(db, friend_user, month))
+
+    incoming_requests = []
+    outgoing_requests = []
+    seen_incoming_ids = set()
+    seen_outgoing_ids = set()
+    for row in pending_rows:
+        request = friend_request_read(db, row, current_user.id)
+        if row.friend_id == current_user.id:
+            if request.user_id in seen_incoming_ids:
+                continue
+            seen_incoming_ids.add(request.user_id)
+            incoming_requests.append(request)
+        if row.owner_id == current_user.id:
+            if request.user_id in seen_outgoing_ids:
+                continue
+            seen_outgoing_ids.add(request.user_id)
+            outgoing_requests.append(request)
+
     return FriendList(
         month=month,
-        friends=[
-            friend_read(db, other_friend_user(db, row, current_user.id), month)
-            for row in rows
-        ],
-        incoming_requests=[
-            friend_request_read(db, row, current_user.id)
-            for row in pending_rows
-            if row.friend_id == current_user.id
-        ],
-        outgoing_requests=[
-            friend_request_read(db, row, current_user.id)
-            for row in pending_rows
-            if row.owner_id == current_user.id
-        ],
+        friends=accepted_friends,
+        incoming_requests=incoming_requests,
+        outgoing_requests=outgoing_requests,
     )
 
 
@@ -136,13 +151,13 @@ def delete_friend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    friendship = friendship_between(db, current_user.id, friend_id)
-    if not friendship:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend not found")
-    if friendship.status != "accepted":
+    friendships = friendships_between(db, current_user.id, friend_id)
+    accepted_friendships = [friendship for friendship in friendships if friendship.status == "accepted"]
+    if not accepted_friendships:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friend not found")
 
-    db.delete(friendship)
+    for friendship in accepted_friendships:
+        db.delete(friendship)
     db.commit()
 
 
@@ -184,6 +199,19 @@ def friendship_between(db: Session, first_user_id: int, second_user_id: int) -> 
             or_(
                 (Friendship.owner_id == first_user_id) & (Friendship.friend_id == second_user_id),
                 (Friendship.owner_id == second_user_id) & (Friendship.friend_id == first_user_id),
+            )
+        )
+    )
+
+
+def friendships_between(db: Session, first_user_id: int, second_user_id: int) -> list[Friendship]:
+    return list(
+        db.scalars(
+            select(Friendship).where(
+                or_(
+                    (Friendship.owner_id == first_user_id) & (Friendship.friend_id == second_user_id),
+                    (Friendship.owner_id == second_user_id) & (Friendship.friend_id == first_user_id),
+                )
             )
         )
     )

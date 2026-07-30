@@ -1318,7 +1318,7 @@
 
   function renderFriends() {
     const month = state.money.filters.month || currentMonth();
-    const friendItems = [selfFriendComparison(getMoneyViewData()), ...friendsSync.items];
+    const friendItems = uniqueFriends([selfFriendComparison(getMoneyViewData()), ...friendsSync.items]);
     return `
       <section class="topbar">
         <div>
@@ -1722,9 +1722,9 @@
     try {
       const month = state.money.filters.month || currentMonth();
       const payload = await apiRequest(`/api/friends?month=${encodeURIComponent(month)}`);
-      friendsSync.items = Array.isArray(payload.friends) ? payload.friends.map(normalizeFriend).filter(Boolean) : [];
-      friendsSync.incoming = Array.isArray(payload.incoming_requests) ? payload.incoming_requests.map(normalizeFriendRequest).filter(Boolean) : [];
-      friendsSync.outgoing = Array.isArray(payload.outgoing_requests) ? payload.outgoing_requests.map(normalizeFriendRequest).filter(Boolean) : [];
+      friendsSync.items = uniqueFriends(Array.isArray(payload.friends) ? payload.friends.map(normalizeFriend).filter(Boolean) : []);
+      friendsSync.incoming = uniqueFriendRequests(Array.isArray(payload.incoming_requests) ? payload.incoming_requests.map(normalizeFriendRequest).filter(Boolean) : []);
+      friendsSync.outgoing = uniqueFriendRequests(Array.isArray(payload.outgoing_requests) ? payload.outgoing_requests.map(normalizeFriendRequest).filter(Boolean) : []);
       friendsSync.month = payload.month || month;
       friendsSync.loaded = true;
     } catch (error) {
@@ -1749,6 +1749,16 @@
     };
   }
 
+  function uniqueFriends(friends) {
+    const seen = new Set();
+    return friends.filter((friend) => {
+      const key = String(friend.id || friend.email || "").toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   function normalizeFriendRequest(request) {
     if (!request || typeof request !== "object") return null;
     return {
@@ -1761,6 +1771,16 @@
       status: String(request.status || ""),
       created_at: String(request.created_at || "")
     };
+  }
+
+  function uniqueFriendRequests(requests) {
+    const seen = new Set();
+    return requests.filter((request) => {
+      const key = String(request.user_id || request.email || request.request_id || "").toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   function transactionTable(transactions, formatter) {
