@@ -1,6 +1,8 @@
 from datetime import timedelta
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +15,14 @@ from app.api.deps import get_current_user
 
 
 router = APIRouter()
+UPLOAD_ROOT = Path(__file__).resolve().parents[3] / "uploads" / "avatars"
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
+ALLOWED_AVATAR_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -62,6 +72,36 @@ def update_me(
             value = value or ""
         setattr(current_user, field, value)
 
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/avatar", response_model=UserRead)
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    content_type = (file.content_type or "").lower()
+    suffix = ALLOWED_AVATAR_TYPES.get(content_type)
+    if not suffix:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported avatar image type")
+
+    content = await file.read(MAX_AVATAR_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar file is empty")
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Avatar file is too large")
+
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    filename = f"user-{current_user.id}-{uuid4().hex}{suffix}"
+    avatar_path = UPLOAD_ROOT / filename
+    avatar_path.write_bytes(content)
+
+    current_user.avatar_url = str(request.url_for("uploads", path=f"avatars/{filename}"))
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

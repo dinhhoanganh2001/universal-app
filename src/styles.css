@@ -794,6 +794,7 @@ h1 {
   color: #ffffff;
   font-weight: 700;
   white-space: nowrap;
+  cursor: pointer;
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
 }
 
@@ -1159,8 +1160,26 @@ tbody tr:hover {
   grid-template-columns: minmax(0, 1fr) minmax(110px, 0.75fr) auto;
   gap: 10px;
   align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #f8fafc, #f0fdfa);
+}
+
+.budget-add-collapsed {
+  display: flex;
+  justify-content: flex-end;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
+}
+
+.budget-add.expanded {
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.75fr) auto;
+  margin-bottom: 0;
+}
+
+.budget-add-actions {
+  grid-column: auto;
 }
 
 .budget-total {
@@ -1288,6 +1307,47 @@ tbody tr:hover {
   font-weight: 900;
 }
 
+.avatar-upload-box {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 104px;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #f8fafc, #f0fdfa);
+}
+
+.avatar-upload-preview {
+  display: grid;
+  place-items: center;
+}
+
+.avatar-upload-copy {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  align-content: center;
+}
+
+.avatar-upload-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar-upload-copy span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.avatar-upload-button {
+  justify-self: start;
+  min-height: 36px;
+}
+
 .profile-hero h2 {
   margin-bottom: 4px;
   overflow-wrap: anywhere;
@@ -1332,6 +1392,10 @@ tbody tr:hover {
 }
 
 .profile-form .form-actions {
+  grid-column: 1 / -1;
+}
+
+.avatar-upload-field {
   grid-column: 1 / -1;
 }
 

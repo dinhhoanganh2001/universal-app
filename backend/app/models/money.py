@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -58,6 +58,7 @@ class Budget(Base):
     minimum_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
     full_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
     color: Mapped[str] = mapped_column(String(20), default="#2563eb", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

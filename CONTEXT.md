@@ -23,14 +23,15 @@ This file is the shared working context for contributors and coding agents. Read
 - The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
 - Users can manage money categories on the `Danh mục` page.
-- The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add dropdown shows the full defined category list and blocks duplicate current-month budgets with a toast.
+- The budget-add dropdown and transaction-add dropdown use the category list defined on the `Danh mục` page; historical categories may still appear in filters so old data remains searchable. The budget-add control is collapsed to a single add button by default, expands into category and amount fields on click, shows the full defined category list, and blocks duplicate current-month budgets with a toast.
 - Users can manage friends on the `Bạn bè` page and see only each friend's total budget progress percentage; the page also shows the current user as a local, non-removable comparison row. Friend lists and request lists are deduped by user id so reciprocal/legacy duplicate friendship rows do not render twice.
-- Users can manage profile settings on the `Hồ sơ` page, including display name, avatar URL, currency preference, and password.
+- Users can manage profile settings on the `Hồ sơ` page, including display name, avatar image upload, currency preference, and password.
 - First-time login shows an onboarding screen that asks currency unit, monthly income, and two budget levels per category: `Chi tiêu tối thiểu` and `Chi tiêu đầy đủ`; users can skip with `Thiết lập sau` or rerun it from `Hồ sơ`. Registration auto-login is allowed, onboarding only appears for an authenticated user, and onboarding money fields intentionally start blank instead of prefilled from saved values. The onboarding screen shows financial independence/freedom timeline estimates directly while the user enters values.
 - Onboarding has a recommended category list and a user-selected category list. Users add recommendations into their list, use the plus control at the end of recommendations to add custom categories, remove selected categories, and the two budget levels are saved independently without requiring `Chi tiêu đầy đủ` to be greater than `Chi tiêu tối thiểu`. Selected onboarding rows use polished card-style edit/display modes: users type values while editing, then confirm the row into labels and can reopen it with the edit button. Recommended/default expense categories include `Dating` and `Gửi bố mẹ`, with costly defaults ordered first (`Nhà ở`, `Ăn uống`, `Gửi bố mẹ`) and `Tiết kiệm` excluded.
 - The budget dashboard estimates time to `Độc lập tài chính` from 25 years of `Chi tiêu tối thiểu`, and `Tự do tài chính` from 25 years of `Chi tiêu đầy đủ`, using monthly income minus the matching budget level as monthly savings.
 - The current money UI is cost/budget focused: income categories, income transaction controls, and income summary cards are hidden/disabled.
 - Budget progress uses backend summary/budget reads so edits recalculate spent amounts from current transaction history.
+- Budget settings are effective from their selected month onward: creating or changing a budget applies to that month and later months until the user changes it again from a later month.
 - Budget progress includes an overall monthly total progress bar above category cards.
 - Budget progress uses two-column chart cards per category with percentage used, spent/limit values, and saved minimum/full spending levels.
 - Budget cards show read-only category names; card edit mode changes only monthly amount and background color.
@@ -89,6 +90,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - `backend/app/core/config.py`: settings, database URL, CORS origins.
 - `backend/app/core/security.py`: JWT and password hashing.
 - `backend/app/api/v1/auth.py`: register, login, current user, profile update, password change, onboarding completion.
+- `backend/uploads/`: ignored runtime storage for uploaded avatar images served from `/uploads`.
 - `backend/app/api/v1/friends.py`: friend request create/accept/reject/cancel, friend delete, and aggregate friend budget percent calculation.
 - `backend/app/api/v1/money.py`: transaction, budget, and summary endpoints.
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
@@ -112,11 +114,13 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - The frontend still calculates top-level summary cards locally from loaded transactions; budget progress now uses backend summary data.
 - Import/export helper code still exists in `src/app.js`, but it is not exposed in the current UI.
 - There are no Alembic migrations yet; tables are created by `Base.metadata.create_all`.
+- Runtime schema checks add missing columns for older local SQLite databases, including budget recurrence state.
 - There is no production auth hardening yet: refresh tokens, cookie-based auth, rate limits, password reset, email verification, or CSRF strategy.
 - Currency selection only changes formatting and numeric input step; it does not convert existing amounts between currencies.
 - Onboarding income is stored for planning context only; the active money workflow still tracks expenses and budgets, not income transactions.
 - Friend links do not have blocking or per-user privacy controls yet.
 - There is no automated frontend browser test yet.
+- Uploaded avatars are stored on the local backend filesystem; there is no cleanup job or object-storage integration yet.
 
 ## Verification Commands
 
@@ -183,3 +187,6 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Improved stale-token recovery by validating the saved token before onboarding renders and preserving in-progress onboarding drafts when a session expires during save.
 - Hid API URL from login/register and profile UI while keeping runtime-config based API resolution.
 - Deduped friend and friend-request lists in backend responses and frontend rendering, and made friend deletion remove all accepted reciprocal rows between two users.
+- Added authenticated avatar image uploads from the profile screen, local `/uploads` static serving, frontend preview/type/size validation, and backend smoke coverage for uploaded avatar URLs.
+- Collapsed the `Ngân sách` tab add-budget form to a single add button until users choose to add a new budget, then shows category and amount fields with save/cancel actions.
+- Changed budget writes to effective-from-month behavior: new budgets, edits, and deletes apply from the selected month onward, while earlier months keep the earlier budget values.

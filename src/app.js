@@ -4,6 +4,13 @@
   const ONBOARDING_DRAFT_STORAGE_KEY = "universal-app-onboarding-draft-v1";
   const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
   const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+  const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+  const avatarMimeLabels = {
+    "image/jpeg": "JPG",
+    "image/png": "PNG",
+    "image/webp": "WEBP",
+    "image/gif": "GIF"
+  };
 
   const legacyCategoryLabels = {
     Food: "Ăn uống",
@@ -113,6 +120,7 @@
   let activeModuleId = "money";
   let editingId = null;
   let editingBudgetId = null;
+  let budgetAddOpen = false;
   let onboardingActive = false;
   let onboardingDraft = null;
 
@@ -1271,9 +1279,23 @@
               <label for="profile-name">Họ tên</label>
               <input id="profile-name" name="full_name" type="text" maxlength="120" value="${escapeAttr(user.full_name || "")}" required>
             </div>
-            <div class="field">
-              <label for="profile-avatar">Ảnh đại diện URL</label>
-              <input id="profile-avatar" name="avatar_url" type="url" maxlength="500" value="${escapeAttr(user.avatar_url || "")}" placeholder="https://...">
+            <div class="field avatar-upload-field">
+              <label for="profile-avatar-file">Ảnh đại diện</label>
+              <input id="profile-avatar" name="avatar_url" type="hidden" value="${escapeAttr(user.avatar_url || "")}">
+              <div class="avatar-upload-box">
+                <div class="avatar-upload-preview" data-avatar-preview>
+                  ${avatarMarkup(user, "profile-avatar-large")}
+                </div>
+                <div class="avatar-upload-copy">
+                  <strong data-avatar-file-name>${user.avatar_url ? "Ảnh hiện tại" : "Chưa có ảnh"}</strong>
+                  <span>JPG, PNG, WEBP hoặc GIF, tối đa 2MB.</span>
+                  <button class="button secondary avatar-upload-button" type="button" data-action="choose-avatar">
+                    ${svgIcon("upload")}
+                    Chọn ảnh
+                  </button>
+                  <input class="hidden-file" id="profile-avatar-file" name="avatar_file" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+                </div>
+              </div>
             </div>
             <div class="field">
               <label for="profile-currency">Tiền tệ</label>
@@ -1861,19 +1883,28 @@
     const totalClassName = totalPercent >= 100 ? "danger" : totalPercent >= 80 ? "warning" : "";
     return `
       <div class="budget-list">
-        <form class="budget-add" data-form="budget">
-          <div class="field">
-            <label for="budget-new-category">Danh mục</label>
-            <select id="budget-new-category" name="category" required ${hasAddOptions ? "" : "disabled"}>
-              ${hasAddOptions ? addOptions.join("") : `<option value="">Chưa có danh mục nào</option>`}
-            </select>
+        ${budgetAddOpen ? `
+          <form class="budget-add expanded" data-form="budget">
+            <div class="field">
+              <label for="budget-new-category">Danh mục</label>
+              <select id="budget-new-category" name="category" required ${hasAddOptions ? "" : "disabled"}>
+                ${hasAddOptions ? addOptions.join("") : `<option value="">Chưa có danh mục nào</option>`}
+              </select>
+            </div>
+            <div class="field">
+              <label for="budget-new-limit">Số tiền</label>
+              <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="${escapeAttr(amountStep())}" placeholder="0" required>
+            </div>
+            <div class="form-actions budget-add-actions">
+              <button class="button secondary" type="button" data-action="close-budget-add">Hủy</button>
+              <button class="button" type="submit" ${hasAddOptions ? "" : "disabled"}>${svgIcon("plus")}Lưu ngân sách</button>
+            </div>
+          </form>
+        ` : `
+          <div class="budget-add-collapsed">
+            <button class="button secondary" type="button" data-action="open-budget-add" ${hasAddOptions ? "" : "disabled"}>${svgIcon("plus")}Thêm ngân sách</button>
           </div>
-          <div class="field">
-            <label for="budget-new-limit">Hạn mức</label>
-            <input id="budget-new-limit" name="limit_amount" type="number" min="0" step="${escapeAttr(amountStep())}" placeholder="0" required>
-          </div>
-          <button class="button secondary" type="submit" ${hasAddOptions ? "" : "disabled"}>${svgIcon("plus")}Thêm</button>
-        </form>
+        `}
         ${items.length ? `
           <div class="budget-total">
             <div class="row-top">
@@ -1991,6 +2022,10 @@
       await skipOnboarding();
     }
 
+    if (action === "choose-avatar") {
+      document.querySelector("#profile-avatar-file")?.click();
+    }
+
     if (action === "add-onboarding-recommendation") {
       syncOnboardingDraftFromDom();
       if (addOnboardingCategory(actionTarget.dataset.category)) app();
@@ -2091,6 +2126,16 @@
       renderActiveModule();
     }
 
+    if (action === "open-budget-add") {
+      budgetAddOpen = true;
+      renderActiveModule();
+    }
+
+    if (action === "close-budget-add") {
+      budgetAddOpen = false;
+      renderActiveModule();
+    }
+
     if (action === "delete-category") {
       await deleteCategory(actionTarget.dataset.categoryId);
     }
@@ -2186,6 +2231,10 @@
       } else {
         event.target.value = previousName;
       }
+    }
+
+    if (event.target.id === "profile-avatar-file") {
+      previewAvatarFile(event.target);
     }
   }
 
@@ -2356,20 +2405,32 @@
     const fullName = String(formData.get("full_name") || "").trim();
     const avatarUrl = String(formData.get("avatar_url") || "").trim();
     const currency = String(formData.get("currency") || "VND");
+    const avatarFile = formData.get("avatar_file");
     if (!fullName) {
       showToast("Hãy nhập họ tên.");
       return;
     }
+    if (hasSelectedAvatarFile(avatarFile)) {
+      const validationMessage = avatarValidationMessage(avatarFile);
+      if (validationMessage) {
+        showToast(validationMessage);
+        return;
+      }
+    }
 
     try {
-      auth.user = normalizeUser(await apiRequest("/api/auth/me", {
+      let updatedUser = await apiRequest("/api/auth/me", {
         method: "PATCH",
         body: {
           full_name: fullName,
           avatar_url: avatarUrl,
           currency
         }
-      }));
+      });
+      if (hasSelectedAvatarFile(avatarFile)) {
+        updatedUser = await uploadAvatarFile(avatarFile);
+      }
+      auth.user = normalizeUser(updatedUser);
       saveAuth();
       moneySync.loaded = false;
       friendsSync.loaded = false;
@@ -2531,6 +2592,76 @@
     return response.json();
   }
 
+  async function uploadAvatarFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    let response;
+    try {
+      response = await fetch(`${apiBaseUrl()}/api/auth/avatar`, {
+        method: "POST",
+        headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
+        body: formData
+      });
+    } catch (error) {
+      throw new Error("Không thể kết nối API. Hãy kiểm tra backend đã chạy chưa.");
+    }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 401 && isInvalidAuthDetail(payload.detail)) {
+        handleAuthExpired();
+        const error = new Error("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
+        error.authExpired = true;
+        throw error;
+      }
+      throw new Error(apiErrorMessage(payload.detail, response.status));
+    }
+
+    return response.json();
+  }
+
+  function hasSelectedAvatarFile(file) {
+    return file instanceof File && file.size > 0;
+  }
+
+  function avatarValidationMessage(file) {
+    if (!avatarMimeLabels[file.type]) {
+      return "Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc GIF.";
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      return "Ảnh đại diện tối đa 2MB.";
+    }
+    return "";
+  }
+
+  function previewAvatarFile(input) {
+    const file = input.files?.[0];
+    const fileName = document.querySelector("[data-avatar-file-name]");
+    const preview = document.querySelector("[data-avatar-preview]");
+    if (!file) {
+      if (fileName) fileName.textContent = auth.user?.avatar_url ? "Ảnh hiện tại" : "Chưa có ảnh";
+      if (preview) preview.innerHTML = avatarMarkup(auth.user || {}, "profile-avatar-large");
+      return;
+    }
+
+    const validationMessage = avatarValidationMessage(file);
+    if (validationMessage) {
+      showToast(validationMessage);
+      input.value = "";
+      return;
+    }
+
+    if (fileName) fileName.textContent = file.name;
+    if (!preview) return;
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const name = auth.user?.full_name || auth.user?.email || "Tài khoản";
+      preview.innerHTML = `<span class="profile-avatar-large"><img src="${escapeAttr(String(reader.result || ""))}" alt="${escapeAttr(name)}"></span>`;
+    });
+    reader.readAsDataURL(file);
+  }
+
   function isInvalidAuthDetail(detail) {
     return detail === "Invalid authentication credentials" || detail === "Not authenticated";
   }
@@ -2571,6 +2702,9 @@
     if (detail === "Friend request not found") return "Không tìm thấy lời mời kết bạn.";
     if (detail === "Friend request is not yours") return "Bạn không thể thao tác lời mời này.";
     if (detail === "Friend not found") return "Không tìm thấy bạn bè.";
+    if (detail === "Unsupported avatar image type") return "Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc GIF.";
+    if (detail === "Avatar file is empty") return "Tệp ảnh không có nội dung.";
+    if (detail === "Avatar file is too large") return "Ảnh đại diện tối đa 2MB.";
     if (status === 0) return "Không thể kết nối API.";
     if (typeof detail === "string") return detail;
     return "Yêu cầu không thành công.";
@@ -2614,8 +2748,9 @@
         }
       });
       form.reset();
+      budgetAddOpen = false;
       await loadMoneyFromApi();
-      showToast("Đã thêm ngân sách.");
+      showToast("Đã thêm ngân sách cho tháng này và các tháng sau.");
     } catch (error) {
       showToast(error.message || "Không thể thêm ngân sách.");
     }
@@ -2634,7 +2769,7 @@
       });
       editingBudgetId = null;
       await loadMoneyFromApi();
-      showToast("Đã cập nhật ngân sách.");
+      showToast("Đã cập nhật ngân sách cho tháng này và các tháng sau.");
     } catch (error) {
       showToast(error.message || "Không thể cập nhật ngân sách.");
       await loadMoneyFromApi();
@@ -2648,10 +2783,11 @@
     }
 
     try {
-      await apiRequest(`/api/money/budgets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const month = state.money.filters.month || currentMonth();
+      await apiRequest(`/api/money/budgets/${encodeURIComponent(id)}?month=${encodeURIComponent(month)}`, { method: "DELETE" });
       if (editingBudgetId === id) editingBudgetId = null;
       await loadMoneyFromApi();
-      showToast("Đã xóa ngân sách.");
+      showToast("Đã xóa ngân sách từ tháng này trở đi.");
     } catch (error) {
       showToast(error.message || "Không thể xóa ngân sách.");
     }
@@ -2664,6 +2800,7 @@
     const color = normalizeBudgetColor(formData.get("color"));
 
     await updateBudget(id, {
+      month: state.money.filters.month || currentMonth(),
       limit_amount: String(limit),
       color
     });

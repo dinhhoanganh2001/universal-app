@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -59,6 +60,17 @@ def main() -> None:
     assert profile.json()["avatar_url"] == "https://example.com/avatar.png", profile.text
     assert profile.json()["currency"] == "USD", profile.text
     assert profile.json()["monthly_income"] == "1200.00", profile.text
+
+    avatar = client.post(
+        "/api/auth/avatar",
+        headers=headers,
+        files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\navatar", "image/png")},
+    )
+    assert avatar.status_code == 200, avatar.text
+    avatar_url = avatar.json()["avatar_url"]
+    assert avatar_url.startswith("http://testserver/uploads/avatars/user-"), avatar.text
+    avatar_file = client.get(avatar_url.replace("http://testserver", ""))
+    assert avatar_file.status_code == 200, avatar_file.text
 
     onboarding = client.patch(
         "/api/auth/onboarding",
@@ -243,6 +255,32 @@ def main() -> None:
     assert budget.json()["full_amount"] == "500.00", budget.text
     assert budget.json()["color"] == "#0f766e", budget.text
     budget_id = budget.json()["id"]
+
+    future_summary = client.get("/api/money/summary?month=2026-08", headers=headers)
+    assert future_summary.status_code == 200, future_summary.text
+    future_budget = next(item for item in future_summary.json()["budgets"] if item["category"] == "Food")
+    assert future_budget["month"] == "2026-08", future_budget
+    assert future_budget["limit_amount"] == "500.00", future_budget
+    assert Decimal(future_budget["spent_amount"]) == Decimal("0.00"), future_budget
+
+    future_budget_update = client.patch(
+        f"/api/money/budgets/{budget_id}",
+        headers=headers,
+        json={"month": "2026-08", "limit_amount": "650.00", "color": "#0891b2"},
+    )
+    assert future_budget_update.status_code == 200, future_budget_update.text
+    assert future_budget_update.json()["month"] == "2026-08", future_budget_update.text
+    assert future_budget_update.json()["limit_amount"] == "650.00", future_budget_update.text
+
+    july_summary = client.get("/api/money/summary?month=2026-07", headers=headers)
+    assert july_summary.status_code == 200, july_summary.text
+    july_budget = next(item for item in july_summary.json()["budgets"] if item["category"] == "Food")
+    assert july_budget["limit_amount"] == "500.00", july_budget
+
+    august_summary = client.get("/api/money/summary?month=2026-08", headers=headers)
+    assert august_summary.status_code == 200, august_summary.text
+    august_budget = next(item for item in august_summary.json()["budgets"] if item["category"] == "Food")
+    assert august_budget["limit_amount"] == "650.00", august_budget
 
     category_update = client.patch(
         f"/api/money/categories/{category_id}",

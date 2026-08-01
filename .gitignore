@@ -3,6 +3,7 @@ __pycache__/
 **/.env
 **/.venv/
 backend/universal_app.db
+backend/uploads/
 src/runtime-config.js
 .service-pids
 .service-logs/

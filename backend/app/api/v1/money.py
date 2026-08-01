@@ -114,6 +114,7 @@ def delete_category(
         select(func.count()).select_from(Budget).where(
             Budget.owner_id == current_user.id,
             Budget.category == category.name,
+            Budget.is_active.is_(True),
         )
     )
     if transaction_count or budget_count:
@@ -231,6 +232,7 @@ def upsert_budget(
         budget.minimum_amount = minimum_amount
         budget.full_amount = full_amount
         budget.color = payload.color
+        budget.is_active = True
     else:
         budget = Budget(
             owner_id=current_user.id,
@@ -240,12 +242,15 @@ def upsert_budget(
             minimum_amount=minimum_amount,
             full_amount=full_amount,
             color=payload.color,
+            is_active=True,
         )
         db.add(budget)
 
+    db.flush()
+    delete_future_budget_versions(db, current_user.id, budget.category, budget.month, budget.id)
     db.commit()
     db.refresh(budget)
-    return budget_read(db, current_user.id, budget)
+    return budget_read(db, current_user.id, budget, payload.month)
 
 
 @router.patch("/budgets/{budget_id}", response_model=BudgetRead)
@@ -268,26 +273,73 @@ def update_budget(
             Budget.id != budget.id,
         )
     )
-    if duplicate:
+    if duplicate and month == budget.month:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Budget already exists for this category and month")
 
-    for field, value in updates.items():
-        setattr(budget, field, value)
+    target_budget = budget
+    if month != budget.month:
+        target_budget = duplicate
+        if not target_budget:
+            target_budget = Budget(
+                owner_id=current_user.id,
+                category=category,
+                month=month,
+                limit_amount=budget.limit_amount,
+                minimum_amount=budget.minimum_amount,
+                full_amount=budget.full_amount,
+                color=budget.color,
+                is_active=True,
+            )
+            db.add(target_budget)
 
-    db.add(budget)
+    target_budget.category = category
+    target_budget.month = month
+    for field, value in updates.items():
+        if field != "month":
+            setattr(target_budget, field, value)
+    target_budget.is_active = True
+
+    db.add(target_budget)
+    db.flush()
+    delete_future_budget_versions(db, current_user.id, target_budget.category, month, target_budget.id)
     db.commit()
-    db.refresh(budget)
-    return budget_read(db, current_user.id, budget)
+    db.refresh(target_budget)
+    return budget_read(db, current_user.id, target_budget, month)
 
 
 @router.delete("/budgets/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_budget(
     budget_id: int,
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
     budget = get_owned_budget(db, current_user.id, budget_id)
-    db.delete(budget)
+    target_month = month or budget.month
+    target_budget = budget if budget.month == target_month else db.scalar(
+        select(Budget).where(
+            Budget.owner_id == current_user.id,
+            Budget.category == budget.category,
+            Budget.month == target_month,
+        )
+    )
+    if not target_budget:
+        target_budget = Budget(
+            owner_id=current_user.id,
+            category=budget.category,
+            month=target_month,
+            limit_amount=budget.limit_amount,
+            minimum_amount=budget.minimum_amount,
+            full_amount=budget.full_amount,
+            color=budget.color,
+            is_active=False,
+        )
+        db.add(target_budget)
+    else:
+        target_budget.is_active = False
+
+    db.flush()
+    delete_future_budget_versions(db, current_user.id, budget.category, target_month, target_budget.id)
     db.commit()
 
 
@@ -357,18 +409,27 @@ def get_owned_category(db: Session, owner_id: int, category_id: int) -> MoneyCat
 
 
 def budget_reads(db: Session, owner_id: int, month: str) -> list[BudgetRead]:
-    budgets = list(
+    budget_versions = list(
         db.scalars(
             select(Budget)
-            .where(Budget.owner_id == owner_id, Budget.month == month)
-            .order_by(Budget.category.asc())
+            .where(Budget.owner_id == owner_id, Budget.month <= month)
+            .order_by(Budget.category.asc(), Budget.month.desc(), Budget.id.desc())
         )
     )
-    return [budget_read(db, owner_id, budget) for budget in budgets]
+    effective_budgets: dict[str, Budget] = {}
+    for budget in budget_versions:
+        if budget.category not in effective_budgets:
+            effective_budgets[budget.category] = budget
+    return [
+        budget_read(db, owner_id, budget, month)
+        for budget in effective_budgets.values()
+        if budget.is_active
+    ]
 
 
-def budget_read(db: Session, owner_id: int, budget: Budget) -> BudgetRead:
-    start, end = month_bounds(budget.month)
+def budget_read(db: Session, owner_id: int, budget: Budget, month: str | None = None) -> BudgetRead:
+    read_month = month or budget.month
+    start, end = month_bounds(read_month)
     spent = db.scalar(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.owner_id == owner_id,
@@ -383,7 +444,7 @@ def budget_read(db: Session, owner_id: int, budget: Budget) -> BudgetRead:
     return BudgetRead(
         id=budget.id,
         category=budget.category,
-        month=budget.month,
+        month=read_month,
         limit_amount=budget.limit_amount,
         minimum_amount=budget.minimum_amount,
         full_amount=budget.full_amount,
@@ -391,6 +452,17 @@ def budget_read(db: Session, owner_id: int, budget: Budget) -> BudgetRead:
         spent_amount=spent_amount,
         percent_used=percent_used,
     )
+
+
+def delete_future_budget_versions(db: Session, owner_id: int, category: str, month: str, keep_id: int | None = None) -> None:
+    query = db.query(Budget).filter(
+        Budget.owner_id == owner_id,
+        Budget.category == category,
+        Budget.month > month,
+    )
+    if keep_id is not None:
+        query = query.filter(Budget.id != keep_id)
+    query.delete(synchronize_session=False)
 
 
 def month_bounds(month: str) -> tuple[date, date]:

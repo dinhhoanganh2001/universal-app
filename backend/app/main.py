@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
 from app.api.routes import api_router
@@ -31,6 +34,10 @@ def create_app() -> FastAPI:
                 f"headers={request.headers.get('access-control-request-headers')!r}",
             )
         return await call_next(request)
+
+    uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
     app.include_router(api_router, prefix="/api")
 
@@ -93,6 +100,10 @@ def ensure_runtime_schema() -> None:
         if "color" not in budget_columns:
             connection.execute(
                 text("ALTER TABLE budgets ADD COLUMN color VARCHAR(20) DEFAULT '#2563eb' NOT NULL")
+            )
+        if "is_active" not in budget_columns:
+            connection.execute(
+                text("ALTER TABLE budgets ADD COLUMN is_active BOOLEAN DEFAULT 1 NOT NULL")
             )
 
 
