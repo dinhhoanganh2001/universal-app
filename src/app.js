@@ -322,7 +322,7 @@
     if (transaction.type === "income") return null;
 
     const amount = Math.max(0, Number(transaction.amount) || 0);
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(transaction.date)) ? String(transaction.date) : new Date().toISOString().slice(0, 10);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(transaction.date)) ? String(transaction.date) : currentDate();
 
     return {
       id: String(transaction.id || newId()),
@@ -416,13 +416,29 @@
   }
 
   function currentMonth() {
-    return new Date().toISOString().slice(0, 7);
+    return monthKeyFromDate(new Date());
+  }
+
+  function currentDate() {
+    return dateKeyFromDate(new Date());
+  }
+
+  function monthKeyFromDate(date) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+  }
+
+  function dateKeyFromDate(date) {
+    return `${monthKeyFromDate(date)}-${pad2(date.getDate())}`;
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, "0");
   }
 
   function shiftMonth(month, offset) {
     const [year, monthIndex] = month.split("-").map(Number);
     const date = new Date(year, monthIndex - 1 + offset, 1, 12);
-    return date.toISOString().slice(0, 7);
+    return monthKeyFromDate(date);
   }
 
   function demoTransactions() {
@@ -1849,7 +1865,7 @@
         <input type="hidden" name="id" value="${escapeAttr(editing ? editing.id : "")}">
         <div class="field">
           <label for="transaction-date">Ngày</label>
-          <input id="transaction-date" name="date" type="date" value="${editing?.date || new Date().toISOString().slice(0, 10)}" required>
+          <input id="transaction-date" name="date" type="date" value="${editing?.date || currentDate()}" required>
         </div>
         <div class="field">
           <label for="transaction-category">Danh mục</label>
@@ -2971,7 +2987,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `universal-app-tien-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `universal-app-tien-${currentDate()}.json`;
     link.click();
     URL.revokeObjectURL(url);
     showToast("Đã tải bản xuất dữ liệu.");

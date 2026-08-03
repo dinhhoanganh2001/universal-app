@@ -20,6 +20,7 @@ This file is the shared working context for contributors and coding agents. Read
 - The frontend login/register screen talks to the backend auth endpoints.
 - The app UI does not expose the API URL; API base configuration comes from generated `src/runtime-config.js`, a previously stored value, or the local default.
 - After login, the frontend money tracker syncs transactions and budgets with the backend.
+- Frontend current month/date defaults use the browser's local timezone, not UTC ISO serialization, so users ahead of UTC do not see the previous day/month.
 - The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
 - Budget checklist rows can be added, renamed, edited, and deleted from the UI.
 - Users can manage money categories on the `Danh mục` page.
@@ -103,6 +104,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - Use SQLite by default through `DATABASE_URL`; this can move to Postgres later without changing route logic.
 - Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`, while `API_BASE_URL` and `BACKEND_CORS_ORIGINS` use the real IP/domain reachable by the browser.
 - Keep frontend module labels and money UI in Vietnamese.
+- Use local browser date parts for user-facing current month/date defaults; avoid `toISOString()` for those values because it serializes in UTC.
 - UI and UX quality should be treated as a core requirement: flows should be polished, clear, compact, responsive, and easy to use before work is considered complete.
 - Keep backend schema field names in English. The transaction table still has a `type` field for compatibility, but the API/UI currently accept and show only `expense` transactions.
 - Store JWT in `localStorage` for now for simple local development.
@@ -190,3 +192,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Added authenticated avatar image uploads from the profile screen, local `/uploads` static serving, frontend preview/type/size validation, and backend smoke coverage for uploaded avatar URLs.
 - Collapsed the `Ngân sách` tab add-budget form to a single add button until users choose to add a new budget, then shows category and amount fields with save/cancel actions.
 - Changed budget writes to effective-from-month behavior: new budgets, edits, and deletes apply from the selected month onward, while earlier months keep the earlier budget values.
+- Fixed current month/date generation to use local timezone values for budget month, transaction date defaults, demo reset, and export filenames.
