@@ -94,6 +94,7 @@
     logout: "M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-5M14 21h5a2 2 0 0 0 2-2",
     user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z",
     friends: "M17 21a6 6 0 0 0-12 0M11 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4M23 21a5 5 0 0 0-7-4.6M17 3a4 4 0 0 1 0 8",
+    game: "M7 3h10l4 7-9 11L3 10l4-7ZM7 3l5 18M17 3l-5 18M3 10h18",
     chevronLeft: "M15 18l-6-6 6-6",
     chevronRight: "M9 18l6-6-6-6",
     check: "M20 6 9 17l-5-5"
@@ -115,6 +116,14 @@
     items: [],
     incoming: [],
     outgoing: []
+  };
+  const gameSync = {
+    loaded: false,
+    loading: false,
+    error: "",
+    data: null,
+    guessDraft: "",
+    pollingId: null
   };
   let authMode = "login";
   let activeModuleId = "money";
@@ -156,6 +165,14 @@
       icon: "friends",
       enabled: true,
       render: renderFriends
+    },
+    {
+      id: "game",
+      label: "GAME",
+      description: "Wordle hằng ngày và tiến độ người chơi.",
+      icon: "game",
+      enabled: true,
+      render: renderGame
     },
     {
       id: "profile",
@@ -536,6 +553,7 @@
   function app() {
     const root = document.querySelector("#app");
     if (!auth.token) {
+      stopGamePolling();
       root.className = "auth-root";
       root.innerHTML = renderAuth();
       bindRoot(root);
@@ -543,6 +561,7 @@
     }
 
     if (onboardingActive || !auth.user?.onboarding_completed) {
+      stopGamePolling();
       root.className = "auth-root";
       root.innerHTML = renderOnboarding();
       bindRoot(root);
@@ -580,6 +599,8 @@
     renderActiveModule();
     ensureMoneyLoaded();
     ensureFriendsLoaded();
+    ensureGameLoaded();
+    updateGamePolling();
   }
 
   function bindRoot(root) {
@@ -1479,6 +1500,184 @@
     `;
   }
 
+  function renderGame() {
+    const game = gameSync.data;
+    const attempts = game?.attempts_used || 0;
+    const maxAttempts = game?.max_attempts || 6;
+    const solvedCount = game?.progress?.filter((player) => player.status === "solved").length || 0;
+    const activeCount = game?.progress?.filter((player) => player.status === "playing").length || 0;
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">GAME</p>
+          <h1>Wordle hôm nay</h1>
+          <p>Đoán một từ tiếng Anh 5 chữ trong 6 lượt. Mọi người dùng nhận cùng một từ mỗi ngày và tiến độ được cập nhật gần thời gian thực.</p>
+        </div>
+        <button class="button secondary" type="button" data-action="refresh-game">${svgIcon("refresh")}Cập nhật</button>
+      </section>
+
+      ${gameSync.loading && !game ? `<div class="sync-banner">Đang tải game hôm nay...</div>` : ""}
+      ${gameSync.error ? `<div class="sync-banner error">${escapeHtml(gameSync.error)}</div>` : ""}
+
+      <section class="metric-grid game-metrics" aria-label="Tổng quan game">
+        <article class="metric">
+          <span>Trạng thái</span>
+          <strong>${escapeHtml(gameStatusLabel(game?.status || "loading"))}</strong>
+          <small>${game?.answer ? `Đáp án: ${escapeHtml(game.answer.toUpperCase())}` : "Đáp án được giữ kín khi đang chơi"}</small>
+        </article>
+        <article class="metric">
+          <span>Lượt đoán</span>
+          <strong>${attempts}/${maxAttempts}</strong>
+          <small>${game ? `${game.remaining_attempts} lượt còn lại` : "Đang tải"}</small>
+        </article>
+        <article class="metric">
+          <span>Người đã giải</span>
+          <strong>${solvedCount}</strong>
+          <small>${game?.progress?.length || 0} người chơi hôm nay</small>
+        </article>
+        <article class="metric">
+          <span>Ván kế tiếp</span>
+          <strong>${escapeHtml(formatGameCountdown(game?.seconds_until_next_puzzle || 0))}</strong>
+          <small>Nguồn top ${escapeHtml(formatNumber(game?.source_word_count || 3000))} từ phổ biến</small>
+        </article>
+      </section>
+
+      <section class="game-layout">
+        <article class="panel game-board-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Bảng đoán</h2>
+              <p>${game ? `Ngày ${escapeHtml(formatDate(game.puzzle_date))} · ${game.answer_pool_count} đáp án phổ biến 5 chữ` : "Đang chuẩn bị dữ liệu"}</p>
+            </div>
+          </div>
+          <div class="game-board-wrap">
+            ${gameBoard(game)}
+            ${gameGuessForm(game)}
+          </div>
+        </article>
+
+        <article class="panel game-progress-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Tiến độ người chơi</h2>
+              <p>${activeCount} người đang chơi · tự cập nhật mỗi 5 giây khi mở tab</p>
+            </div>
+          </div>
+          <div class="game-progress-list">
+            ${game?.progress?.length ? game.progress.map(gameProgressRow).join("") : `<div class="empty-state">Chưa có tiến độ người chơi hôm nay.</div>`}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function gameBoard(game) {
+    const wordLength = game?.word_length || 5;
+    const maxAttempts = game?.max_attempts || 6;
+    const guesses = game?.guesses || [];
+    return `
+      <div class="wordle-board" aria-label="Bảng Wordle">
+        ${Array.from({ length: maxAttempts }, (_, index) => gameBoardRow(guesses[index], wordLength)).join("")}
+      </div>
+    `;
+  }
+
+  function gameBoardRow(guess, wordLength) {
+    const letters = guess ? guess.word.toUpperCase().split("") : Array.from({ length: wordLength }, () => "");
+    const results = guess?.result || [];
+    return `
+      <div class="wordle-row">
+        ${Array.from({ length: wordLength }, (_, index) => `
+          <span class="wordle-tile ${results[index] || ""}" title="${escapeAttr(gameTileLabel(results[index]))}">
+            ${escapeHtml(letters[index] || "")}
+          </span>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function gameGuessForm(game) {
+    const isPlaying = game?.status === "playing";
+    const disabled = !game || !isPlaying || gameSync.loading;
+    return `
+      <form class="game-guess-form" data-form="game-guess">
+        <div class="field">
+          <label for="game-guess-word">Từ đoán</label>
+          <input id="game-guess-word" name="word" data-game-guess-input type="text" minlength="5" maxlength="5" pattern="[A-Za-z]{5}" autocomplete="off" autocapitalize="characters" value="${escapeAttr(gameSync.guessDraft)}" ${disabled ? "disabled" : ""} required>
+        </div>
+        <button class="button" type="submit" ${disabled ? "disabled" : ""}>Đoán</button>
+      </form>
+      ${game?.status === "solved" ? `<p class="game-result good">Bạn đã giải đúng trong ${game.attempts_used} lượt.</p>` : ""}
+      ${game?.status === "failed" ? `<p class="game-result danger">Hết lượt. Đáp án hôm nay là ${escapeHtml(String(game.answer || "").toUpperCase())}.</p>` : ""}
+    `;
+  }
+
+  function gameProgressRow(player) {
+    const isSelf = String(player.user_id) === String(auth.user?.id);
+    return `
+      <div class="game-progress-row ${isSelf ? "self" : ""}">
+        <div class="friend-profile">
+          ${avatarMarkup({ ...player, id: player.user_id }, "friend-avatar")}
+          <div>
+            <strong>${escapeHtml(player.full_name || "Người chơi")}</strong>
+            <small>${isSelf ? "Bạn" : `ID ${escapeHtml(player.user_id)}`} · ${escapeHtml(formatDateTime(player.updated_at))}</small>
+          </div>
+        </div>
+        <div class="friend-progress">
+          <div class="row-top">
+            <strong>${escapeHtml(gameStatusLabel(player.status))}</strong>
+            <span>${player.attempts_used}/${player.max_attempts} lượt</span>
+          </div>
+          ${gameProgressBoard(player)}
+        </div>
+      </div>
+    `;
+  }
+
+  function gameProgressBoard(player) {
+    const maxAttempts = Math.max(1, Number(player.max_attempts || 6));
+    const wordLength = gameSync.data?.word_length || 5;
+    const board = Array.isArray(player.board) ? player.board : [];
+    return `
+      <div class="wordle-mini-board" aria-label="Bảng màu của ${escapeAttr(player.full_name || "người chơi")}">
+        ${Array.from({ length: maxAttempts }, (_, rowIndex) => `
+          <div class="wordle-mini-row">
+            ${Array.from({ length: wordLength }, (_, tileIndex) => {
+              const result = board[rowIndex]?.[tileIndex] || "";
+              return `<span class="wordle-mini-tile ${escapeAttr(result)}" title="${escapeAttr(gameTileLabel(result))}"></span>`;
+            }).join("")}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function gameStatusLabel(status) {
+    if (status === "solved") return "Đã giải";
+    if (status === "failed") return "Hết lượt";
+    if (status === "playing") return "Đang chơi";
+    return "Đang tải";
+  }
+
+  function gameTileLabel(result) {
+    if (result === "correct") return "Đúng chữ, đúng vị trí";
+    if (result === "present") return "Có chữ, sai vị trí";
+    if (result === "absent") return "Không có trong từ";
+    return "Ô trống";
+  }
+
+  function formatGameCountdown(seconds) {
+    const safeSeconds = Math.max(0, Number(seconds || 0));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    if (hours <= 0) return `${minutes} phút`;
+    return `${hours} giờ ${minutes} phút`;
+  }
+
+  function formatNumber(value) {
+    return new Intl.NumberFormat("vi-VN").format(Number(value || 0));
+  }
+
   function friendInitials(value) {
     return String(value || "?")
       .trim()
@@ -1678,6 +1877,12 @@
     await loadFriendsFromApi();
   }
 
+  async function ensureGameLoaded() {
+    if (!auth.token || activeModuleId !== "game" || gameSync.loading) return;
+    if (gameSync.loaded) return;
+    await loadGameFromApi();
+  }
+
   async function loadMoneyFromApi() {
     moneySync.loading = true;
     moneySync.error = "";
@@ -1775,6 +1980,58 @@
     }
   }
 
+  async function loadGameFromApi(options = {}) {
+    const quiet = Boolean(options.quiet);
+    if (!quiet) {
+      gameSync.loading = true;
+      gameSync.error = "";
+      renderActiveModule();
+    }
+
+    try {
+      const previousDate = gameSync.data?.puzzle_date || "";
+      gameSync.data = normalizeGameState(await apiRequest("/api/game/today"));
+      if (previousDate && gameSync.data?.puzzle_date !== previousDate) gameSync.guessDraft = "";
+      gameSync.loaded = true;
+      gameSync.error = "";
+    } catch (error) {
+      if (error.authExpired) return;
+      gameSync.error = error.message || "Không thể tải game hôm nay.";
+    } finally {
+      gameSync.loading = false;
+      const shouldRender = !quiet || !isEditingGameGuess();
+      if (shouldRender && auth.token && activeModuleId === "game" && document.querySelector("#main")) {
+        renderActiveModule();
+      }
+    }
+  }
+
+  function isEditingGameGuess() {
+    const input = document.querySelector("[data-game-guess-input]");
+    return Boolean(input && document.activeElement === input && input.value.trim());
+  }
+
+  function updateGamePolling() {
+    if (auth.token && activeModuleId === "game") {
+      if (!gameSync.pollingId) {
+        gameSync.pollingId = window.setInterval(() => {
+          if (auth.token && activeModuleId === "game" && !gameSync.loading) {
+            loadGameFromApi({ quiet: true });
+          }
+        }, 5000);
+      }
+      return;
+    }
+
+    stopGamePolling();
+  }
+
+  function stopGamePolling() {
+    if (!gameSync.pollingId) return;
+    window.clearInterval(gameSync.pollingId);
+    gameSync.pollingId = null;
+  }
+
   function normalizeFriend(friend) {
     if (!friend || typeof friend !== "object") return null;
     return {
@@ -1819,6 +2076,54 @@
       seen.add(key);
       return true;
     });
+  }
+
+  function normalizeGameState(game) {
+    if (!game || typeof game !== "object") return null;
+    return {
+      puzzle_date: String(game.puzzle_date || currentDate()),
+      word_length: Math.max(1, Number(game.word_length || 5)),
+      max_attempts: Math.max(1, Number(game.max_attempts || 6)),
+      attempts_used: Math.max(0, Number(game.attempts_used || 0)),
+      remaining_attempts: Math.max(0, Number(game.remaining_attempts || 0)),
+      status: String(game.status || "playing"),
+      guesses: Array.isArray(game.guesses) ? game.guesses.map(normalizeGameGuess).filter(Boolean) : [],
+      answer: game.answer ? String(game.answer).toLowerCase() : "",
+      progress: Array.isArray(game.progress) ? game.progress.map(normalizeGameProgress).filter(Boolean) : [],
+      source_word_count: Math.max(0, Number(game.source_word_count || 0)),
+      answer_pool_count: Math.max(0, Number(game.answer_pool_count || 0)),
+      seconds_until_next_puzzle: Math.max(0, Number(game.seconds_until_next_puzzle || 0))
+    };
+  }
+
+  function normalizeGameGuess(guess) {
+    if (!guess || typeof guess !== "object") return null;
+    const word = String(guess.word || "").toLowerCase();
+    if (!word) return null;
+    return {
+      word,
+      result: Array.isArray(guess.result) ? guess.result.map((item) => String(item || "")) : [],
+      created_at: String(guess.created_at || "")
+    };
+  }
+
+  function normalizeGameProgress(player) {
+    if (!player || typeof player !== "object") return null;
+    return {
+      user_id: String(player.user_id || ""),
+      full_name: String(player.full_name || ""),
+      avatar_url: String(player.avatar_url || ""),
+      attempts_used: Math.max(0, Number(player.attempts_used || 0)),
+      max_attempts: Math.max(1, Number(player.max_attempts || 6)),
+      board: Array.isArray(player.board) ? player.board.map(normalizeGameProgressRow).filter(Boolean) : [],
+      status: String(player.status || "playing"),
+      updated_at: String(player.updated_at || "")
+    };
+  }
+
+  function normalizeGameProgressRow(row) {
+    if (!Array.isArray(row)) return null;
+    return row.map((item) => String(item || "")).slice(0, 5);
   }
 
   function transactionTable(transactions, formatter) {
@@ -2015,6 +2320,10 @@
       app();
     }
 
+    if (action === "refresh-game") {
+      await loadGameFromApi();
+    }
+
     if (action === "switch-auth-mode") {
       authMode = authMode === "login" ? "register" : "login";
       app();
@@ -2112,6 +2421,12 @@
       localStorage.removeItem(AUTH_STORAGE_KEY);
       editingId = null;
       editingBudgetId = null;
+      gameSync.loaded = false;
+      gameSync.loading = false;
+      gameSync.error = "";
+      gameSync.data = null;
+      gameSync.guessDraft = "";
+      stopGamePolling();
       onboardingDraft = null;
       onboardingActive = false;
       clearOnboardingDraft();
@@ -2190,6 +2505,11 @@
     if (event.target.matches("#filter-search")) {
       state.money.filters.search = event.target.value;
       saveState();
+    }
+
+    if (event.target.matches("[data-game-guess-input]")) {
+      event.target.value = event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 5);
+      gameSync.guessDraft = event.target.value;
     }
 
     if (event.target.closest("[data-form='onboarding']")) {
@@ -2297,6 +2617,13 @@
       return;
     }
 
+    const gameGuessForm = event.target.closest("[data-form='game-guess']");
+    if (gameGuessForm) {
+      event.preventDefault();
+      await submitGameGuess(gameGuessForm);
+      return;
+    }
+
     const profileForm = event.target.closest("[data-form='profile']");
     if (profileForm) {
       event.preventDefault();
@@ -2387,6 +2714,11 @@
       moneySync.loaded = false;
       moneySync.budgetMonth = "";
       moneySync.error = "";
+      gameSync.loaded = false;
+      gameSync.loading = false;
+      gameSync.error = "";
+      gameSync.data = null;
+      gameSync.guessDraft = "";
       saveAuth();
       app();
       showToast(mode === "register" ? "Tạo tài khoản thành công." : "Đăng nhập thành công.");
@@ -2577,6 +2909,37 @@
     )));
   }
 
+  async function submitGameGuess(form) {
+    const formData = new FormData(form);
+    const word = String(formData.get("word") || "").trim().toLowerCase();
+    if (!/^[a-z]{5}$/.test(word)) {
+      showToast("Hãy nhập một từ tiếng Anh 5 chữ.");
+      return;
+    }
+
+    gameSync.loading = true;
+    gameSync.error = "";
+    renderActiveModule();
+    try {
+      gameSync.data = normalizeGameState(await apiRequest("/api/game/guesses", {
+        method: "POST",
+        body: { word }
+      }));
+      gameSync.loaded = true;
+      gameSync.guessDraft = "";
+      showToast(gameSync.data?.status === "solved" ? "Chính xác." : "Đã ghi lượt đoán.");
+    } catch (error) {
+      if (error.authExpired) return;
+      gameSync.error = error.message || "Không thể gửi lượt đoán.";
+      showToast(gameSync.error);
+    } finally {
+      gameSync.loading = false;
+      if (auth.token && activeModuleId === "game" && document.querySelector("#main")) {
+        renderActiveModule();
+      }
+    }
+  }
+
   async function apiRequest(path, options = {}) {
     const token = options.token === undefined ? auth.token : options.token;
     let response;
@@ -2696,6 +3059,12 @@
     moneySync.budgetMonth = "";
     friendsSync.loaded = false;
     friendsSync.loading = false;
+    gameSync.loaded = false;
+    gameSync.loading = false;
+    gameSync.error = "";
+    gameSync.data = null;
+    gameSync.guessDraft = "";
+    stopGamePolling();
     localStorage.removeItem(AUTH_STORAGE_KEY);
     app();
     showToast(hasDraft ? "Phiên đăng nhập đã hết hạn. Đã giữ lại thiết lập đang nhập, hãy đăng nhập lại." : "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
@@ -2718,6 +3087,10 @@
     if (detail === "Friend request not found") return "Không tìm thấy lời mời kết bạn.";
     if (detail === "Friend request is not yours") return "Bạn không thể thao tác lời mời này.";
     if (detail === "Friend not found") return "Không tìm thấy bạn bè.";
+    if (detail === "Today's game is already complete") return "Bạn đã hoàn thành Wordle hôm nay.";
+    if (detail === "No guesses remaining") return "Bạn đã hết lượt đoán hôm nay.";
+    if (detail === "Guess is not in the word pool") return "Từ này không nằm trong bộ từ của game.";
+    if (detail === "You already guessed this word") return "Bạn đã đoán từ này rồi.";
     if (detail === "Unsupported avatar image type") return "Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc GIF.";
     if (detail === "Avatar file is empty") return "Tệp ảnh không có nội dung.";
     if (detail === "Avatar file is too large") return "Ảnh đại diện tối đa 2MB.";

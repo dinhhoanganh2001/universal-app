@@ -40,6 +40,10 @@ This file is the shared working context for contributors and coding agents. Read
 - The UI uses a more colorful visual system with varied card accents, richer sidebar/auth surfaces, colorful progress bars, and chart colors.
 - `index.html` includes version query strings on frontend assets to avoid stale browser cache after deploys.
 - The visible money screen no longer exposes import/export/demo-data buttons.
+- The app has a `GAME` navigation tab with a simple authenticated Wordle-style daily game.
+- Wordle uses one deterministic shared daily five-letter English answer for all users, allows 6 guesses, stores each user's attempt on the backend, and shows same-day player progress via polling without revealing other users' guesses.
+- Wordle preserves the in-progress guess while the 5-second progress poll runs, and poll responses do not re-render the game screen while the guess input is actively being edited.
+- The Wordle player progress panel shows each player's full 6-row board as color-only tiles; letters/words are not exposed for other players.
 
 ## How To Run
 
@@ -94,6 +98,9 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - `backend/uploads/`: ignored runtime storage for uploaded avatar images served from `/uploads`.
 - `backend/app/api/v1/friends.py`: friend request create/accept/reject/cancel, friend delete, and aggregate friend budget percent calculation.
 - `backend/app/api/v1/money.py`: transaction, budget, and summary endpoints.
+- `backend/app/api/v1/game.py`: daily Wordle state, guess submission, scoring, word-pool handling, and player progress reads.
+- `backend/app/models/game.py`: `WordleAttempt` table for daily guesses/status per user.
+- `backend/app/schemas/game.py`: Pydantic contracts for Wordle guesses, game state, and player progress.
 - `backend/scripts/smoke_test.py`: backend integration smoke test.
 - `backend/scripts/cors_smoke_test.py`: CORS preflight smoke test.
 - `start_service.sh`: starts both backend and frontend in the background with `nohup`.
@@ -123,6 +130,8 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 - Friend links do not have blocking or per-user privacy controls yet.
 - There is no automated frontend browser test yet.
 - Uploaded avatars are stored on the local backend filesystem; there is no cleanup job or object-storage integration yet.
+- Wordle "real-time" progress is simple 5-second frontend polling, not WebSockets/SSE.
+- The Wordle answer list is a curated common five-letter subset, while the accepted guess pool expands to 3000 words from the local system dictionary when available.
 
 ## Verification Commands
 
@@ -193,3 +202,6 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Collapsed the `Ngân sách` tab add-budget form to a single add button until users choose to add a new budget, then shows category and amount fields with save/cancel actions.
 - Changed budget writes to effective-from-month behavior: new budgets, edits, and deletes apply from the selected month onward, while earlier months keep the earlier budget values.
 - Fixed current month/date generation to use local timezone values for budget month, transaction date defaults, demo reset, and export filenames.
+- Added the `GAME` navigation tab with a backend-backed Wordle-style daily puzzle, shared daily answer, 6 guesses, per-user stored attempts, same-day player progress polling, and smoke test coverage for game load/guess/duplicate-guess behavior.
+- Fixed Wordle polling so a partially typed guess no longer disappears before the user submits it.
+- Changed Wordle player progress from a percentage bar to a full color-only mini board for each player, backed by privacy-safe board result data from the game API.

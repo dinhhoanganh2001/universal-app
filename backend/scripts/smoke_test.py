@@ -207,6 +207,28 @@ def main() -> None:
     deleted_friend = client.delete(f"/api/friends/{id_friend_id}", headers=headers)
     assert deleted_friend.status_code == 204, deleted_friend.text
 
+    game_today = client.get("/api/game/today", headers=headers)
+    assert game_today.status_code == 200, game_today.text
+    game_payload = game_today.json()
+    assert game_payload["word_length"] == 5, game_payload
+    assert game_payload["max_attempts"] == 6, game_payload
+    assert game_payload["source_word_count"] == 3000, game_payload
+    assert game_payload["status"] == "playing", game_payload
+
+    game_guess = client.post("/api/game/guesses", headers=headers, json={"word": "apple"})
+    assert game_guess.status_code == 200, game_guess.text
+    game_guess_payload = game_guess.json()
+    assert game_guess_payload["attempts_used"] == 1, game_guess_payload
+    assert len(game_guess_payload["guesses"]) == 1, game_guess_payload
+    assert len(game_guess_payload["guesses"][0]["result"]) == 5, game_guess_payload
+    assert any(player["user_id"] == demo_user_id for player in game_guess_payload["progress"]), game_guess_payload
+    demo_game_progress = next(player for player in game_guess_payload["progress"] if player["user_id"] == demo_user_id)
+    assert demo_game_progress["board"] == [game_guess_payload["guesses"][0]["result"]], game_guess_payload
+    assert "word" not in demo_game_progress, demo_game_progress
+
+    duplicate_game_guess = client.post("/api/game/guesses", headers=headers, json={"word": "apple"})
+    assert duplicate_game_guess.status_code == 409, duplicate_game_guess.text
+
     category = client.post("/api/money/categories", headers=headers, json={"name": "Food"})
     assert category.status_code == 201, category.text
     category_id = category.json()["id"]
