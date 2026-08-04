@@ -46,6 +46,45 @@ class MoneyCategory(Base):
     owner = relationship("User", back_populates="money_categories")
 
 
+class MoneyBucket(Base):
+    __tablename__ = "money_buckets"
+    __table_args__ = (UniqueConstraint("owner_id", name="uq_money_bucket_owner"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    owner = relationship("User", back_populates="money_bucket")
+
+
+class MoneyFund(Base):
+    __tablename__ = "money_funds"
+    __table_args__ = (UniqueConstraint("owner_id", "name", name="uq_money_fund_owner_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    saved_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    color: Mapped[str] = mapped_column(String(20), default="#0f766e", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    owner = relationship("User", back_populates="money_funds")
+
+
 class Budget(Base):
     __tablename__ = "budgets"
     __table_args__ = (UniqueConstraint("owner_id", "category", "month", name="uq_budget_owner_category_month"),)

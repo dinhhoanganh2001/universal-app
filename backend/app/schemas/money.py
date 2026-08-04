@@ -107,6 +107,47 @@ class CategoryRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BucketUpdate(BaseModel):
+    total_amount: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+
+
+class BucketRead(BucketUpdate):
+    id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FundCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    target_amount: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    saved_amount: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=12, decimal_places=2)
+    color: str = Field(default="#0f766e", pattern=r"^#[0-9A-Fa-f]{6}$")
+
+    @field_validator("name")
+    @classmethod
+    def trim_fund_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class FundUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    target_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    saved_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+    @field_validator("name")
+    @classmethod
+    def trim_optional_fund_name(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else value
+
+
+class FundRead(FundCreate):
+    id: int
+    percent_saved: int = 0
+
+    model_config = {"from_attributes": True}
+
+
 class CategorySpend(BaseModel):
     category: str
     spent_amount: Decimal

@@ -2,6 +2,7 @@
   const STORAGE_KEY = "universal-app-state-v2";
   const AUTH_STORAGE_KEY = "universal-app-auth-v1";
   const ONBOARDING_DRAFT_STORAGE_KEY = "universal-app-onboarding-draft-v1";
+  const FEATURE_NOTIFICATION_STORAGE_KEY = "universal-app-feature-notifications-v1";
   const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
   const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
   const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -77,6 +78,79 @@
   ];
   const defaultBudgetColor = budgetColors[0];
   const dangerBudgetColor = "#e11d48";
+  const fundColors = [
+    "#0f766e",
+    "#2563eb",
+    "#7c3aed",
+    "#f59e0b",
+    "#0891b2",
+    "#16a34a",
+    "#4f46e5",
+    "#64748b"
+  ];
+  const defaultFundColor = fundColors[0];
+  const automaticFundDefinitions = [
+    {
+      id: "emergency",
+      name: "Quỹ khẩn cấp",
+      subtitle: "12 tháng Chi tiêu tối thiểu",
+      color: "#0f766e",
+      target: (totals) => totals.minimum * 12
+    },
+    {
+      id: "independence",
+      name: "Quỹ độc lập tài chính",
+      subtitle: "25 năm Chi tiêu tối thiểu",
+      color: "#2563eb",
+      target: (totals) => totals.minimum * 12 * 25
+    },
+    {
+      id: "freedom",
+      name: "Quỹ tự do tài chính",
+      subtitle: "25 năm Chi tiêu đầy đủ",
+      color: "#7c3aed",
+      target: (totals) => totals.full * 12 * 25
+    }
+  ];
+  const automaticFundAliases = [
+    "Độc lập tài chính",
+    "Tự do tài chính"
+  ];
+  const automaticFundNames = new Set([
+    ...automaticFundDefinitions.map((fund) => fund.name),
+    ...automaticFundAliases
+  ].map((name) => name.toLowerCase()));
+  const defaultFundRecommendations = [
+    "Du lịch",
+    "Đầu tư cổ phiếu"
+  ];
+  const featureAnnouncements = [
+    {
+      id: "funds-bucket-automatic-2026-08-04",
+      badge: "Tính năng mới",
+      title: "Túi tiền và Quỹ dài hạn",
+      dateLabel: "04/08/2026",
+      summary: "Theo dõi tổng tiền hiện có, mục tiêu tiết kiệm riêng, và ba quỹ chiến lược được tự động tính từ ngân sách.",
+      purpose: [
+        "Túi tiền giúp bạn ghi lại tổng số tiền đang có ở thời điểm hiện tại.",
+        "Quỹ riêng giúp bạn đặt mục tiêu dài hạn như du lịch, đầu tư cổ phiếu hoặc khoản mua lớn.",
+        "Quỹ khẩn cấp, Quỹ độc lập tài chính và Quỹ tự do tài chính được tự tính từ Chi tiêu tối thiểu và Chi tiêu đầy đủ để bạn không phải nhập tay."
+      ],
+      recommended: [
+        "Dùng Túi tiền khi bạn muốn có một con số tổng cho tiền mặt, tài khoản ngân hàng và khoản tiết kiệm dễ dùng.",
+        "Dùng Quỹ riêng khi mục tiêu không lặp lại theo tháng, ví dụ chuyến đi, học phí, thiết bị làm việc hoặc khoản đầu tư.",
+        "Dùng ba quỹ tự động để kiểm tra nhanh mức an toàn tài chính: khẩn cấp bằng 12 tháng chi tiêu tối thiểu, độc lập tài chính bằng 25 năm chi tiêu tối thiểu, tự do tài chính bằng 25 năm chi tiêu đầy đủ."
+      ],
+      howTo: [
+        "Mở tab Túi tiền, nhập Tổng tiền hiện có rồi lưu.",
+        "Thiết lập Chi tiêu tối thiểu và Chi tiêu đầy đủ trong onboarding hoặc Ngân sách để các quỹ tự động có mục tiêu đúng.",
+        "Tạo Quỹ riêng bằng tên, mục tiêu và số tiền đã có; cập nhật định kỳ khi bạn chuyển thêm tiền vào mục tiêu đó.",
+        "Xem phần Quỹ tự động để biết Túi tiền hiện tại đã đạt bao nhiêu phần trăm so với các mốc khẩn cấp, độc lập và tự do tài chính."
+      ],
+      ctaLabel: "Mở Túi tiền",
+      moduleId: "funds"
+    }
+  ];
 
   const icons = {
     money: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6",
@@ -95,6 +169,8 @@
     user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z",
     friends: "M17 21a6 6 0 0 0-12 0M11 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4M23 21a5 5 0 0 0-7-4.6M17 3a4 4 0 0 1 0 8",
     game: "M7 3h10l4 7-9 11L3 10l4-7ZM7 3l5 18M17 3l-5 18M3 10h18",
+    bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
+    close: "M18 6 6 18M6 6l12 12",
     chevronLeft: "M15 18l-6-6 6-6",
     chevronRight: "M9 18l6-6-6-6",
     check: "M20 6 9 17l-5-5"
@@ -102,6 +178,7 @@
 
   const state = loadState();
   const auth = loadAuth();
+  const readFeatureNotificationIds = loadReadFeatureNotificationIds();
   const moneySync = {
     loaded: false,
     loading: false,
@@ -132,6 +209,8 @@
   let budgetAddOpen = false;
   let onboardingActive = false;
   let onboardingDraft = null;
+  let featureNotificationPanelOpen = false;
+  let featureNotificationAutoChecked = false;
 
   const modules = [
     {
@@ -157,6 +236,14 @@
       icon: "projects",
       enabled: true,
       render: renderCategories
+    },
+    {
+      id: "funds",
+      label: "Túi tiền",
+      description: "Theo dõi tổng tiền hiện có và các quỹ dài hạn.",
+      icon: "goals",
+      enabled: true,
+      render: renderFunds
     },
     {
       id: "friends",
@@ -221,6 +308,8 @@
         transactions: demoTransactions(),
         categories: defaultCategories,
         categoryRecords: [],
+        bucket: { id: "", total: 0 },
+        funds: [],
         budgets: defaultBudgets,
         filters: {
           month: currentMonth(),
@@ -248,6 +337,10 @@
         transactions: Array.isArray(money.transactions) ? money.transactions.map(normalizeTransaction).filter(Boolean) : [],
         budgetRecords: Array.isArray(money.budgetRecords) ? money.budgetRecords.map(normalizeBudgetRecord).filter(Boolean) : [],
         categoryRecords: Array.isArray(money.categoryRecords) ? money.categoryRecords.map(normalizeCategoryRecord).filter(Boolean) : [],
+        bucket: normalizeBucketRecord(money.bucket),
+        funds: Array.isArray(money.funds)
+          ? money.funds.map(normalizeFundRecord).filter((fund) => fund && !isAutomaticFundName(fund.name))
+          : [],
         categories: normalizeCategories(money.categories),
         budgets,
         filters: {
@@ -296,6 +389,40 @@
       percent: Math.max(0, Number(budget.percent || budget.percent_used || 0)),
       color: normalizeBudgetColor(budget.color)
     };
+  }
+
+  function normalizeBucketRecord(bucket) {
+    if (!bucket || typeof bucket !== "object") return { id: "", total: 0 };
+    return {
+      id: bucket.id === undefined || bucket.id === null ? "" : String(bucket.id),
+      total: Math.max(0, Number(bucket.total || bucket.total_amount || 0))
+    };
+  }
+
+  function normalizeFundRecord(fund) {
+    if (!fund || typeof fund !== "object") return null;
+    const name = String(fund.name || "").trim().slice(0, 80);
+    if (!name) return null;
+    const target = Math.max(0, Number(fund.target || fund.target_amount || 0));
+    const saved = Math.max(0, Number(fund.saved || fund.saved_amount || 0));
+    return {
+      id: fund.id === undefined || fund.id === null ? "" : String(fund.id),
+      name,
+      target,
+      saved,
+      percent: Math.max(0, Number(fund.percent || fund.percent_saved || (target > 0 ? Math.round((saved / target) * 100) : 0))),
+      color: normalizeFundColor(fund.color)
+    };
+  }
+
+  function isAutomaticFundName(name) {
+    return automaticFundNames.has(String(name || "").trim().toLowerCase());
+  }
+
+  function normalizeFundColor(value) {
+    const color = String(value || "").trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return defaultFundColor;
+    return color;
   }
 
   function normalizeBudgetColor(value) {
@@ -387,11 +514,21 @@
         full: String(row.full || ""),
         editing: row.editing !== false
       })).filter((row) => row.category) : [];
+      const fundRows = Array.isArray(parsed.fundRows) ? parsed.fundRows.map((row) => ({
+        name: String(row.name || "").trim().slice(0, 80),
+        target: String(row.target || ""),
+        saved: String(row.saved || ""),
+        editing: row.editing !== false
+      })).filter((row) => row.name && !isAutomaticFundName(row.name)) : [];
       return {
+        bucketTotal: String(parsed.bucketTotal || ""),
         monthlyIncome: String(parsed.monthlyIncome || ""),
         currency: currencyOptions[parsed.currency] ? parsed.currency : auth.user?.currency || "VND",
+        customFund: String(parsed.customFund || ""),
+        customFundOpen: Boolean(parsed.customFundOpen),
         customCategory: String(parsed.customCategory || ""),
         customCategoryOpen: Boolean(parsed.customCategoryOpen),
+        fundRows,
         rows
       };
     } catch (error) {
@@ -407,6 +544,36 @@
 
   function clearOnboardingDraft() {
     localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY);
+  }
+
+  function loadReadFeatureNotificationIds() {
+    const stored = localStorage.getItem(FEATURE_NOTIFICATION_STORAGE_KEY);
+    if (!stored) return new Set();
+
+    try {
+      const parsed = JSON.parse(stored);
+      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch (error) {
+      console.warn("Unable to parse feature notification state.", error);
+      return new Set();
+    }
+  }
+
+  function saveReadFeatureNotificationIds() {
+    localStorage.setItem(FEATURE_NOTIFICATION_STORAGE_KEY, JSON.stringify([...readFeatureNotificationIds]));
+  }
+
+  function unreadFeatureAnnouncements() {
+    return featureAnnouncements.filter((announcement) => !readFeatureNotificationIds.has(announcement.id));
+  }
+
+  function unreadFeatureAnnouncementCount() {
+    return unreadFeatureAnnouncements().length;
+  }
+
+  function markFeatureAnnouncementsRead() {
+    featureAnnouncements.forEach((announcement) => readFeatureNotificationIds.add(announcement.id));
+    saveReadFeatureNotificationIds();
   }
 
   function normalizeUser(user) {
@@ -554,6 +721,8 @@
     const root = document.querySelector("#app");
     if (!auth.token) {
       stopGamePolling();
+      featureNotificationPanelOpen = false;
+      featureNotificationAutoChecked = false;
       root.className = "auth-root";
       root.innerHTML = renderAuth();
       bindRoot(root);
@@ -562,10 +731,16 @@
 
     if (onboardingActive || !auth.user?.onboarding_completed) {
       stopGamePolling();
+      featureNotificationPanelOpen = false;
       root.className = "auth-root";
       root.innerHTML = renderOnboarding();
       bindRoot(root);
       return;
+    }
+
+    if (!featureNotificationAutoChecked) {
+      featureNotificationPanelOpen = unreadFeatureAnnouncementCount() > 0;
+      featureNotificationAutoChecked = true;
     }
 
     root.className = "app-shell";
@@ -581,6 +756,7 @@
         <nav class="module-list" aria-label="Modules">
           ${modules.map(moduleButton).join("")}
         </nav>
+        ${featureNotificationButton()}
         <div class="sidebar-footer">
           <div class="account-chip">
             ${avatarMarkup(auth.user)}
@@ -593,6 +769,7 @@
         </div>
       </aside>
       <main class="main" id="main"></main>
+      ${featureNotificationPanelOpen ? featureNotificationPanel() : ""}
     `;
 
     bindRoot(root);
@@ -706,15 +883,25 @@
     const currency = currencyByCode(draft.currency);
     const formatter = formatterForCurrency(currency);
     const selectedNames = new Set(draft.rows.map((row) => row.category.toLowerCase()));
+    const selectedFundNames = new Set(draft.fundRows.map((row) => row.name.toLowerCase()));
     const recommendations = onboardingRecommendationOptions().filter((category) => !selectedNames.has(category.toLowerCase()));
+    const fundRecommendations = defaultFundRecommendations.filter((name) => !selectedFundNames.has(name.toLowerCase()));
     return `
       <main class="onboarding-shell">
         <section class="onboarding-frame">
           <div class="onboarding-copy">
             <p class="eyebrow">Thiết lập ban đầu</p>
-            <h1>Lập ngân sách theo cách bạn thật sự chi tiêu.</h1>
-            <p>Nhập thu nhập tháng và hai mức ngân sách cho từng danh mục. Có thể chạy lại trong Hồ sơ.</p>
+            <h1>Lập Túi tiền, Quỹ và ngân sách.</h1>
+            <p>Nhập tổng tiền hiện có, thêm quỹ riêng nếu cần, rồi thiết lập thu nhập và ngân sách tháng. Quỹ khẩn cấp, độc lập tài chính và tự do tài chính được tự tính từ ngân sách.</p>
             <div class="onboarding-definitions">
+              <div>
+                <strong>Túi tiền</strong>
+                <span>Tổng số tiền bạn đang có đến hiện tại, gồm tiền mặt, tài khoản ngân hàng hoặc khoản tiết kiệm dễ dùng.</span>
+              </div>
+              <div>
+                <strong>Quỹ</strong>
+                <span>Mục tiêu tiết kiệm dài hạn. Ba quỹ chiến lược được tính tự động; bạn chỉ cần thêm quỹ riêng như du lịch hoặc đầu tư.</span>
+              </div>
               <div>
                 <strong>Chi tiêu tối thiểu</strong>
                 <span>Mức cần thiết mỗi tháng: hóa đơn bắt buộc, ăn uống cơ bản, di chuyển và khoản không nên bỏ.</span>
@@ -734,6 +921,44 @@
               </div>
             </div>
             <div class="onboarding-body">
+              <section class="onboarding-money-start">
+                <div class="field">
+                  <label for="onboarding-bucket-total">Túi tiền hiện có</label>
+                  <input id="onboarding-bucket-total" name="bucket_total" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(draft.bucketTotal)}" placeholder="0" required>
+                </div>
+              </section>
+
+              <section class="onboarding-list onboarding-funds">
+                <div class="onboarding-list-header">
+                  <h3>Quỹ dài hạn</h3>
+                  <span>${draft.fundRows.length} quỹ riêng</span>
+                </div>
+                <div class="onboarding-fund-recommendations">
+                  ${fundRecommendations.map((name) => `
+                    <button class="onboarding-recommendation" type="button" data-action="add-onboarding-fund-recommendation" data-fund="${escapeAttr(name)}">
+                      <span>${escapeHtml(name)}</span>
+                      <strong>Thêm</strong>
+                    </button>
+                  `).join("")}
+                  ${draft.customFundOpen ? `
+                    <div class="onboarding-custom-inline">
+                      <input data-onboarding-fund-custom type="text" maxlength="80" value="${escapeAttr(draft.customFund)}" placeholder="Tên quỹ" autofocus>
+                      <button class="icon-button primary" type="button" data-action="add-onboarding-fund-custom" title="Thêm quỹ">
+                        ${svgIcon("plus")}
+                      </button>
+                    </div>
+                  ` : `
+                    <button class="onboarding-add-custom" type="button" data-action="open-onboarding-fund-custom" title="Thêm quỹ riêng">
+                      ${svgIcon("plus")}
+                    </button>
+                  `}
+                </div>
+                <div class="onboarding-fund-list">
+                  ${onboardingFundRows(draft.fundRows, currency)}
+                  ${draft.fundRows.length ? "" : `<p class="empty-state">Chọn quỹ gợi ý hoặc thêm quỹ riêng. Quỹ khẩn cấp, độc lập tài chính và tự do tài chính sẽ hiện tự động sau khi bạn nhập ngân sách.</p>`}
+                </div>
+              </section>
+
               <div class="onboarding-settings">
                 <div class="field">
                   <label for="onboarding-income">Thu nhập tháng</label>
@@ -866,6 +1091,64 @@
     }).join("");
   }
 
+  function onboardingFundRows(rows, currency) {
+    const formatter = formatterForCurrency(currency);
+    return rows.map((row, index) => {
+      const isEditing = row.editing !== false;
+      return `
+        <div class="onboarding-fund-row ${isEditing ? "editing" : ""}" data-onboarding-fund-name="${escapeAttr(row.name)}" data-onboarding-fund-target-value="${escapeAttr(row.target)}" data-onboarding-fund-saved-value="${escapeAttr(row.saved)}" data-onboarding-fund-row-index="${index}" data-onboarding-fund-editing="${isEditing ? "true" : "false"}">
+          ${isEditing ? `
+            <div class="onboarding-fund-main">
+              <label class="onboarding-edit-field">
+                <span>Tên quỹ</span>
+                <input data-onboarding-fund-name-input name="fund_name_${index}" type="text" maxlength="80" value="${escapeAttr(row.name)}" placeholder="Tên quỹ" required>
+              </label>
+              <label class="onboarding-edit-field">
+                <span>Mục tiêu</span>
+                <input data-onboarding-fund-target name="fund_target_${index}" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(row.target)}" placeholder="0" required>
+              </label>
+              <label class="onboarding-edit-field">
+                <span>Đã có</span>
+                <input data-onboarding-fund-saved name="fund_saved_${index}" type="number" min="0" step="${escapeAttr(currency.step)}" value="${escapeAttr(row.saved)}" placeholder="0">
+              </label>
+            </div>
+            <div class="onboarding-row-actions">
+              <button class="icon-button primary" type="button" data-action="finish-onboarding-fund-edit" data-row-index="${index}" title="Xong">
+                ${svgIcon("check")}
+              </button>
+              <button class="icon-button danger" type="button" data-action="remove-onboarding-fund" data-row-index="${index}" title="Xóa">
+                ${svgIcon("trash")}
+              </button>
+            </div>
+          ` : `
+            <div class="onboarding-fund-main">
+              <div class="onboarding-value">
+                <span>Tên quỹ</span>
+                <strong>${escapeHtml(row.name)}</strong>
+              </div>
+              <div class="onboarding-value">
+                <span>Mục tiêu</span>
+                <strong>${escapeHtml(formatOnboardingAmount(row.target, formatter))}</strong>
+              </div>
+              <div class="onboarding-value">
+                <span>Đã có</span>
+                <strong>${escapeHtml(formatOnboardingAmount(row.saved, formatter))}</strong>
+              </div>
+            </div>
+            <div class="onboarding-row-actions">
+              <button class="icon-button" type="button" data-action="edit-onboarding-fund" data-row-index="${index}" title="Sửa">
+                ${svgIcon("edit")}
+              </button>
+              <button class="icon-button danger" type="button" data-action="remove-onboarding-fund" data-row-index="${index}" title="Xóa">
+                ${svgIcon("trash")}
+              </button>
+            </div>
+          `}
+        </div>
+      `;
+    }).join("");
+  }
+
   function formatterForCurrency(currency) {
     return new Intl.NumberFormat(currency.locale, {
       style: "currency",
@@ -884,8 +1167,9 @@
     const minimumBudget = draft.rows.reduce((sum, row) => sum + Number(row.minimum || 0), 0);
     const fullBudget = draft.rows.reduce((sum, row) => sum + Number(row.full || 0), 0);
     return `
-      ${onboardingEstimateCard("Độc lập tài chính", "25 năm Chi tiêu tối thiểu", financialFreedomEstimate(monthlyIncome, minimumBudget), formatter)}
-      ${onboardingEstimateCard("Tự do tài chính", "25 năm Chi tiêu đầy đủ", financialFreedomEstimate(monthlyIncome, fullBudget), formatter)}
+      ${onboardingEstimateCard("Quỹ khẩn cấp", "12 tháng Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12), formatter)}
+      ${onboardingEstimateCard("Quỹ độc lập tài chính", "25 năm Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12 * 25), formatter)}
+      ${onboardingEstimateCard("Quỹ tự do tài chính", "25 năm Chi tiêu đầy đủ", targetSavingsEstimate(monthlyIncome, fullBudget, 12 * 25), formatter)}
     `;
   }
 
@@ -914,10 +1198,19 @@
   function ensureOnboardingDraft() {
     if (!onboardingDraft) {
       onboardingDraft = loadOnboardingDraft() || {
+        bucketTotal: state.money.bucket?.total ? String(state.money.bucket.total) : "",
         monthlyIncome: "",
         currency: auth.user?.currency || "VND",
+        customFund: "",
+        customFundOpen: false,
         customCategory: "",
         customCategoryOpen: false,
+        fundRows: (state.money.funds || []).map((fund) => ({
+          name: fund.name,
+          target: String(fund.target || ""),
+          saved: String(fund.saved || ""),
+          editing: false
+        })).filter((fund) => !isAutomaticFundName(fund.name)),
         rows: []
       };
     }
@@ -930,9 +1223,19 @@
     if (!form) return draft;
 
     const formData = new FormData(form);
+    draft.bucketTotal = String(formData.get("bucket_total") || "");
     draft.monthlyIncome = String(formData.get("monthly_income") || "");
     draft.currency = currencyOptions[formData.get("currency")] ? String(formData.get("currency")) : "VND";
+    draft.customFund = String(form.querySelector("[data-onboarding-fund-custom]")?.value || "").trim();
     draft.customCategory = String(form.querySelector("[data-onboarding-custom]")?.value || "").trim();
+    draft.fundRows = [...form.querySelectorAll("[data-onboarding-fund-name]")].map((row) => {
+      return {
+        name: String(row.querySelector("[data-onboarding-fund-name-input]")?.value || row.dataset.onboardingFundName || "").trim().slice(0, 80),
+        target: String(row.querySelector("[data-onboarding-fund-target]")?.value || row.dataset.onboardingFundTargetValue || ""),
+        saved: String(row.querySelector("[data-onboarding-fund-saved]")?.value || row.dataset.onboardingFundSavedValue || ""),
+        editing: row.dataset.onboardingFundEditing !== "false"
+      };
+    }).filter((row) => row.name && !isAutomaticFundName(row.name));
     draft.rows = [...form.querySelectorAll("[data-onboarding-category]")].map((row) => {
       return {
         category: localizeCategoryName(row.querySelector("[data-onboarding-row-category]")?.value || row.dataset.onboardingCategory),
@@ -949,6 +1252,16 @@
     const seen = new Set();
     return rows.some((row) => {
       const key = row.category.toLowerCase();
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
+    });
+  }
+
+  function hasDuplicateOnboardingFunds(rows) {
+    const seen = new Set();
+    return rows.some((row) => {
+      const key = row.name.toLowerCase();
       if (seen.has(key)) return true;
       seen.add(key);
       return false;
@@ -986,6 +1299,45 @@
     return true;
   }
 
+  function finishOnboardingFundEdit(index) {
+    const draft = syncOnboardingDraftFromDom();
+    const row = draft.fundRows[index];
+    if (!row?.name) {
+      showToast("Hãy nhập tên quỹ.");
+      return false;
+    }
+    if (hasDuplicateOnboardingFunds(draft.fundRows)) {
+      showToast("Quỹ này đã có trong danh sách của bạn.");
+      return false;
+    }
+    if (isAutomaticFundName(row.name)) {
+      showToast("Quỹ này được tự động tính từ ngân sách.");
+      return false;
+    }
+    row.editing = false;
+    return true;
+  }
+
+  function addOnboardingFund(name) {
+    const draft = ensureOnboardingDraft();
+    const safeName = String(name || "").trim().slice(0, 80);
+    if (!safeName) {
+      showToast("Hãy nhập tên quỹ.");
+      return false;
+    }
+    if (draft.fundRows.some((row) => row.name.toLowerCase() === safeName.toLowerCase())) {
+      showToast("Quỹ này đã có trong danh sách của bạn.");
+      return false;
+    }
+    if (isAutomaticFundName(safeName)) {
+      showToast("Quỹ này được tự động tính từ ngân sách.");
+      return false;
+    }
+    draft.fundRows.push({ name: safeName, target: "", saved: "", editing: true });
+    saveOnboardingDraft();
+    return true;
+  }
+
   function moduleButton(module) {
     return `
       <button class="module-button ${module.id === activeModuleId ? "active" : ""}"
@@ -994,6 +1346,73 @@
         <span class="module-icon">${svgIcon(module.icon)}</span>
         <span>${module.label}</span>
       </button>
+    `;
+  }
+
+  function featureNotificationButton() {
+    const unreadCount = unreadFeatureAnnouncementCount();
+    return `
+      <button class="module-button notification-button" data-action="open-feature-notifications" title="Thông báo tính năng">
+        <span class="module-icon">${svgIcon("bell")}</span>
+        <span>Thông báo</span>
+        ${unreadCount ? `<strong class="notification-count">${unreadCount}</strong>` : ""}
+      </button>
+    `;
+  }
+
+  function featureNotificationPanel() {
+    return `
+      <div class="notification-layer" role="dialog" aria-modal="true" aria-labelledby="feature-notification-title">
+        <section class="notification-panel">
+          <div class="notification-header">
+            <div>
+              <p class="eyebrow">Cập nhật mới</p>
+              <h2 id="feature-notification-title">Thông báo tính năng</h2>
+            </div>
+            <button class="icon-button" type="button" data-action="close-feature-notifications" title="Đóng thông báo">
+              ${svgIcon("close")}
+            </button>
+          </div>
+          <div class="notification-list">
+            ${featureAnnouncements.map(featureAnnouncementCard).join("")}
+          </div>
+          <div class="notification-actions">
+            <button class="button secondary" type="button" data-action="close-feature-notifications">Đã hiểu</button>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function featureAnnouncementCard(announcement) {
+    return `
+      <article class="notification-card ${readFeatureNotificationIds.has(announcement.id) ? "read" : "unread"}">
+        <div class="notification-card-top">
+          <span>${escapeHtml(announcement.badge)}</span>
+          <small>${escapeHtml(announcement.dateLabel)}</small>
+        </div>
+        <h3>${escapeHtml(announcement.title)}</h3>
+        <p>${escapeHtml(announcement.summary)}</p>
+        ${featureAnnouncementSection("Mục đích", announcement.purpose)}
+        ${featureAnnouncementSection("Nên dùng khi", announcement.recommended)}
+        ${featureAnnouncementSection("Cách dùng", announcement.howTo)}
+        <div class="notification-card-actions">
+          <button class="button" type="button" data-action="open-feature-module" data-module-id="${escapeAttr(announcement.moduleId)}">
+            ${escapeHtml(announcement.ctaLabel)}
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
+  function featureAnnouncementSection(title, items) {
+    return `
+      <div class="notification-section">
+        <strong>${escapeHtml(title)}</strong>
+        <ul>
+          ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        </ul>
+      </div>
     `;
   }
 
@@ -1220,6 +1639,203 @@
           </div>
         </div>
       </section>
+    `;
+  }
+
+  function renderFunds() {
+    const formatter = preciseMoneyFormatter();
+    const data = getMoneyViewData();
+    const bucket = state.money.bucket || { total: 0 };
+    const customFunds = (state.money.funds || []).filter((fund) => !isAutomaticFundName(fund.name));
+    const automaticFunds = automaticFundRecords(data, bucket);
+    const allocated = customFunds.reduce((sum, fund) => sum + Number(fund.saved || 0), 0);
+    const unallocated = Math.max(0, Number(bucket.total || 0) - allocated);
+    const totalTarget = [
+      ...automaticFunds,
+      ...customFunds
+    ].reduce((sum, fund) => sum + Number(fund.target || 0), 0);
+    return `
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Túi tiền</p>
+          <h1>Túi tiền và Quỹ dài hạn</h1>
+          <p>Túi tiền là tổng số tiền bạn đang có. Quỹ khẩn cấp, độc lập tài chính và tự do tài chính được tự tính từ ngân sách; các quỹ còn lại là mục tiêu riêng của bạn.</p>
+        </div>
+      </section>
+
+      ${moneySync.loading ? `<div class="sync-banner">Đang đồng bộ túi tiền và quỹ...</div>` : ""}
+      ${moneySync.error ? `<div class="sync-banner error">${escapeHtml(moneySync.error)}</div>` : ""}
+
+      <section class="metric-grid fund-metrics" aria-label="Tổng quan túi tiền">
+        <article class="metric">
+          <span>Túi tiền hiện có</span>
+          <strong>${formatter.format(bucket.total || 0)}</strong>
+          <small>Tổng tài sản tiền mặt/tiết kiệm bạn nhập</small>
+        </article>
+        <article class="metric">
+          <span>Đã phân vào quỹ riêng</span>
+          <strong>${formatter.format(allocated)}</strong>
+          <small>${customFunds.length} quỹ tự tạo đang theo dõi</small>
+        </article>
+        <article class="metric">
+          <span>Chưa phân bổ</span>
+          <strong>${formatter.format(unallocated)}</strong>
+          <small>Túi tiền trừ phần đã ghi vào quỹ</small>
+        </article>
+        <article class="metric">
+          <span>Mục tiêu quỹ</span>
+          <strong>${formatter.format(totalTarget)}</strong>
+          <small>Gồm quỹ tự động và quỹ riêng</small>
+        </article>
+      </section>
+
+      <section class="fund-layout">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Cập nhật Túi tiền</h2>
+              <p>Nhập tổng tiền bạn đang có đến hiện tại.</p>
+            </div>
+          </div>
+          <form class="bucket-form" data-form="bucket">
+            <div class="field">
+              <label for="bucket-total">Tổng tiền hiện có</label>
+              <input id="bucket-total" name="total_amount" type="number" min="0" step="${escapeAttr(amountStep())}" value="${escapeAttr(bucket.total || "")}" placeholder="0" required>
+            </div>
+            <button class="button" type="submit">Lưu Túi tiền</button>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Thêm Quỹ</h2>
+              <p>Tạo mục tiêu riêng như du lịch hoặc đầu tư. Ba quỹ chiến lược được tự tính bên dưới.</p>
+            </div>
+          </div>
+          <form class="fund-form" data-form="fund">
+            <div class="field">
+              <label for="fund-name">Tên quỹ</label>
+              <input id="fund-name" name="name" type="text" maxlength="80" placeholder="Ví dụ: Du lịch" required>
+            </div>
+            <div class="field">
+              <label for="fund-target">Mục tiêu</label>
+              <input id="fund-target" name="target_amount" type="number" min="0" step="${escapeAttr(amountStep())}" placeholder="0" required>
+            </div>
+            <div class="field">
+              <label for="fund-saved">Đã có</label>
+              <input id="fund-saved" name="saved_amount" type="number" min="0" step="${escapeAttr(amountStep())}" placeholder="0">
+            </div>
+            <button class="button" type="submit">${svgIcon("plus")}Thêm Quỹ</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel fund-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Quỹ tự động</h2>
+            <p>Tự tính sau khi bạn thiết lập Chi tiêu tối thiểu và Chi tiêu đầy đủ.</p>
+          </div>
+        </div>
+        <div class="fund-card-grid">
+          ${automaticFunds.map((fund) => automaticFundCard(fund, formatter)).join("")}
+        </div>
+      </section>
+
+      <section class="panel fund-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Quỹ riêng</h2>
+            <p>Theo dõi tiến độ từng mục tiêu tiết kiệm dài hạn bạn tự tạo.</p>
+          </div>
+        </div>
+        <div class="fund-card-grid">
+          ${customFunds.length ? customFunds.map((fund) => fundCard(fund, formatter)).join("") : `<div class="empty-state">Chưa có quỹ riêng nào. Tạo quỹ riêng để theo dõi mục tiêu dài hạn ngoài ba quỹ tự động.</div>`}
+        </div>
+      </section>
+    `;
+  }
+
+  function automaticFundCard(fund, formatter) {
+    const percent = Math.max(0, Number(fund.percent || 0));
+    return `
+      <article class="fund-card automatic-fund-card" style="--fund-color: ${escapeAttr(normalizeFundColor(fund.color))}">
+        <div class="fund-card-top readonly">
+          <div>
+            <span class="fund-card-badge">Tự động</span>
+            <h3>${escapeHtml(fund.name)}</h3>
+          </div>
+          <small>${escapeHtml(fund.subtitle)}</small>
+        </div>
+        <div class="fund-card-amounts">
+          <div class="fund-value">
+            <span>Mục tiêu</span>
+            <strong>${formatter.format(fund.target)}</strong>
+          </div>
+          <div class="fund-value">
+            <span>Đang có</span>
+            <strong>${formatter.format(fund.saved)}</strong>
+          </div>
+        </div>
+        <div class="fund-progress">
+          <div class="row-top">
+            <strong>${percent}%</strong>
+            <span>${formatter.format(fund.saved)} / ${formatter.format(fund.target)}</span>
+          </div>
+          <div class="progress" style="--value: ${Math.min(percent, 100)}%">
+            <span></span>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function fundCard(fund, formatter) {
+    const percent = Math.max(0, Number(fund.percent || 0));
+    return `
+      <form class="fund-card" data-form="fund-card" data-fund-id="${escapeAttr(fund.id)}" style="--fund-color: ${escapeAttr(normalizeFundColor(fund.color))}">
+        <div class="fund-card-top">
+          <div>
+            <label for="fund-name-${escapeAttr(fund.id)}">Tên quỹ</label>
+            <input id="fund-name-${escapeAttr(fund.id)}" name="name" type="text" maxlength="80" value="${escapeAttr(fund.name)}" required>
+          </div>
+          <button class="button secondary icon" type="button" data-action="delete-fund" data-fund-id="${escapeAttr(fund.id)}" title="Xóa quỹ">${svgIcon("trash")}</button>
+        </div>
+        <div class="fund-card-amounts">
+          <div class="field">
+            <label for="fund-target-${escapeAttr(fund.id)}">Mục tiêu</label>
+            <input id="fund-target-${escapeAttr(fund.id)}" name="target_amount" type="number" min="0" step="${escapeAttr(amountStep())}" value="${escapeAttr(fund.target)}" required>
+          </div>
+          <div class="field">
+            <label for="fund-saved-${escapeAttr(fund.id)}">Đã có</label>
+            <input id="fund-saved-${escapeAttr(fund.id)}" name="saved_amount" type="number" min="0" step="${escapeAttr(amountStep())}" value="${escapeAttr(fund.saved)}" required>
+          </div>
+        </div>
+        <div class="fund-progress">
+          <div class="row-top">
+            <strong>${percent}%</strong>
+            <span>${formatter.format(fund.saved)} / ${formatter.format(fund.target)}</span>
+          </div>
+          <div class="progress" style="--value: ${Math.min(percent, 100)}%">
+            <span></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Màu</label>
+          <div class="color-picker">
+            ${fundColors.map((swatch) => `
+              <label class="color-swatch" style="--swatch: ${escapeAttr(swatch)}" title="${escapeAttr(swatch)}">
+                <input type="radio" name="color" value="${escapeAttr(swatch)}" ${swatch.toLowerCase() === normalizeFundColor(fund.color).toLowerCase() ? "checked" : ""}>
+                <span></span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="button" type="submit">Lưu Quỹ</button>
+        </div>
+      </form>
     `;
   }
 
@@ -1553,6 +2169,7 @@
           <div class="game-board-wrap">
             ${gameBoard(game)}
             ${gameGuessForm(game)}
+            ${gameKeyboard(game)}
           </div>
         </article>
 
@@ -1610,6 +2227,46 @@
       ${game?.status === "solved" ? `<p class="game-result good">Bạn đã giải đúng trong ${game.attempts_used} lượt.</p>` : ""}
       ${game?.status === "failed" ? `<p class="game-result danger">Hết lượt. Đáp án hôm nay là ${escapeHtml(String(game.answer || "").toUpperCase())}.</p>` : ""}
     `;
+  }
+
+  function gameKeyboard(game) {
+    const disabled = !game || game.status !== "playing" || gameSync.loading;
+    const rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+    const statuses = gameKeyboardStatuses(game);
+    return `
+      <div class="wordle-keyboard" aria-label="Bàn phím Wordle">
+        ${rows.map((row, rowIndex) => `
+          <div class="wordle-keyboard-row">
+            ${rowIndex === 2 ? keyboardButton("enter", "Đoán", "", disabled) : ""}
+            ${row.split("").map((letter) => keyboardButton(letter, letter, statuses[letter] || "", disabled)).join("")}
+            ${rowIndex === 2 ? keyboardButton("backspace", "Xóa", "", disabled) : ""}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function keyboardButton(key, label, status, disabled) {
+    return `
+      <button class="wordle-key ${status} ${key.length > 1 ? "wide" : ""}" type="button" data-action="game-key" data-key="${escapeAttr(key)}" ${disabled ? "disabled" : ""}>
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }
+
+  function gameKeyboardStatuses(game) {
+    const priority = { absent: 1, present: 2, correct: 3 };
+    const statuses = {};
+    (game?.guesses || []).forEach((guess) => {
+      String(guess.word || "").toUpperCase().split("").forEach((letter, index) => {
+        const result = guess.result?.[index] || "";
+        if (!result) return;
+        if ((priority[result] || 0) > (priority[statuses[letter]] || 0)) {
+          statuses[letter] = result;
+        }
+      });
+    });
+    return statuses;
   }
 
   function gameProgressRow(player) {
@@ -1744,16 +2401,43 @@
       expenseCount: selectedMonthTransactions.length,
       categorySpend,
       budgetProgress,
+      minimumMonthlyBudget,
+      fullMonthlyBudget,
       minimumFreedom: financialFreedomEstimate(monthlyIncome, minimumMonthlyBudget),
       fullFreedom: financialFreedomEstimate(monthlyIncome, fullMonthlyBudget)
     };
   }
 
+  function automaticFundRecords(data, bucket) {
+    const totals = {
+      minimum: Number(data.minimumMonthlyBudget || 0),
+      full: Number(data.fullMonthlyBudget || 0)
+    };
+    const saved = Math.max(0, Number(bucket?.total || 0));
+    return automaticFundDefinitions.map((definition) => {
+      const target = Math.max(0, Number(definition.target(totals) || 0));
+      return {
+        id: definition.id,
+        name: definition.name,
+        subtitle: definition.subtitle,
+        target,
+        saved,
+        percent: target > 0 ? Math.round((saved / target) * 100) : 0,
+        color: definition.color
+      };
+    });
+  }
+
   function financialFreedomEstimate(monthlyIncome, monthlyBudget) {
+    return targetSavingsEstimate(monthlyIncome, monthlyBudget, 12 * 25);
+  }
+
+  function targetSavingsEstimate(monthlyIncome, monthlyBudget, targetMonths) {
     const safeIncome = Math.max(0, Number(monthlyIncome || 0));
     const safeBudget = Math.max(0, Number(monthlyBudget || 0));
+    const safeTargetMonths = Math.max(0, Number(targetMonths || 0));
     const monthlySavings = safeIncome - safeBudget;
-    const target = safeBudget * 12 * 25;
+    const target = safeBudget * safeTargetMonths;
     return {
       monthlyIncome: safeIncome,
       monthlyBudget: safeBudget,
@@ -1865,6 +2549,24 @@
     });
   }
 
+  function bucketRecordFromApi(bucket) {
+    return normalizeBucketRecord({
+      id: bucket?.id || "",
+      total_amount: bucket?.total_amount || 0
+    });
+  }
+
+  function fundRecordFromApi(fund) {
+    return normalizeFundRecord({
+      id: fund.id,
+      name: fund.name,
+      target_amount: fund.target_amount,
+      saved_amount: fund.saved_amount,
+      percent_saved: fund.percent_saved,
+      color: fund.color
+    });
+  }
+
   async function ensureMoneyLoaded() {
     if (!auth.token || moneySync.loading) return;
     if (moneySync.loaded && moneySync.budgetMonth === state.money.filters.month) return;
@@ -1891,14 +2593,20 @@
     try {
       const month = state.money.filters.month || currentMonth();
       const categories = await loadCategoriesFromApi();
-      const [transactions, summary] = await Promise.all([
+      const [transactions, summary, bucket, funds] = await Promise.all([
         apiRequest("/api/money/transactions"),
-        apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`)
+        apiRequest(`/api/money/summary?month=${encodeURIComponent(month)}`),
+        apiRequest("/api/money/bucket"),
+        apiRequest("/api/money/funds")
       ]);
       const budgets = summary.budgets || [];
       state.money.transactions = transactions.map(mapTransactionFromApi).filter(Boolean);
       state.money.budgetRecords = budgets.map(budgetRecordFromApi);
       state.money.budgets = budgetsFromApi(budgets);
+      state.money.bucket = bucketRecordFromApi(bucket);
+      state.money.funds = Array.isArray(funds)
+        ? funds.map(fundRecordFromApi).filter((fund) => fund && !isAutomaticFundName(fund.name))
+        : [];
       state.money.categoryRecords = categories.map(categoryRecordFromApi);
       state.money.categories = normalizeCategories(state.money.categoryRecords.map((category) => category.name));
       moneySync.loaded = true;
@@ -2320,8 +3028,33 @@
       app();
     }
 
+    if (action === "open-feature-notifications") {
+      featureNotificationPanelOpen = true;
+      app();
+    }
+
+    if (action === "close-feature-notifications") {
+      markFeatureAnnouncementsRead();
+      featureNotificationPanelOpen = false;
+      app();
+    }
+
+    if (action === "open-feature-module") {
+      markFeatureAnnouncementsRead();
+      featureNotificationPanelOpen = false;
+      const nextModuleId = actionTarget.dataset.moduleId;
+      if (modules.some((module) => module.enabled && module.id === nextModuleId)) {
+        activeModuleId = nextModuleId;
+      }
+      app();
+    }
+
     if (action === "refresh-game") {
       await loadGameFromApi();
+    }
+
+    if (action === "game-key") {
+      applyGameKey(actionTarget.dataset.key);
     }
 
     if (action === "switch-auth-mode") {
@@ -2356,9 +3089,20 @@
       if (addOnboardingCategory(actionTarget.dataset.category)) app();
     }
 
+    if (action === "add-onboarding-fund-recommendation") {
+      syncOnboardingDraftFromDom();
+      if (addOnboardingFund(actionTarget.dataset.fund)) app();
+    }
+
     if (action === "open-onboarding-custom") {
       const draft = syncOnboardingDraftFromDom();
       draft.customCategoryOpen = true;
+      app();
+    }
+
+    if (action === "open-onboarding-fund-custom") {
+      const draft = syncOnboardingDraftFromDom();
+      draft.customFundOpen = true;
       app();
     }
 
@@ -2367,6 +3111,15 @@
       if (addOnboardingCategory(draft.customCategory)) {
         draft.customCategory = "";
         draft.customCategoryOpen = false;
+        app();
+      }
+    }
+
+    if (action === "add-onboarding-fund-custom") {
+      const draft = syncOnboardingDraftFromDom();
+      if (addOnboardingFund(draft.customFund)) {
+        draft.customFund = "";
+        draft.customFundOpen = false;
         app();
       }
     }
@@ -2381,14 +3134,36 @@
       }
     }
 
+    if (action === "edit-onboarding-fund") {
+      const draft = syncOnboardingDraftFromDom();
+      const index = Number(actionTarget.dataset.rowIndex);
+      if (draft.fundRows[index]) {
+        draft.fundRows[index].editing = true;
+        saveOnboardingDraft();
+        app();
+      }
+    }
+
     if (action === "finish-onboarding-row-edit") {
       if (finishOnboardingRowEdit(Number(actionTarget.dataset.rowIndex))) app();
+    }
+
+    if (action === "finish-onboarding-fund-edit") {
+      if (finishOnboardingFundEdit(Number(actionTarget.dataset.rowIndex))) app();
     }
 
     if (action === "remove-onboarding-category") {
       const draft = syncOnboardingDraftFromDom();
       const index = Number(actionTarget.dataset.rowIndex);
       draft.rows = draft.rows.filter((_, rowIndex) => rowIndex !== index);
+      saveOnboardingDraft();
+      app();
+    }
+
+    if (action === "remove-onboarding-fund") {
+      const draft = syncOnboardingDraftFromDom();
+      const index = Number(actionTarget.dataset.rowIndex);
+      draft.fundRows = draft.fundRows.filter((_, rowIndex) => rowIndex !== index);
       saveOnboardingDraft();
       app();
     }
@@ -2471,6 +3246,10 @@
       await deleteCategory(actionTarget.dataset.categoryId);
     }
 
+    if (action === "delete-fund") {
+      await deleteFund(actionTarget.dataset.fundId);
+    }
+
     if (action === "delete-friend") {
       await deleteFriend(actionTarget.dataset.friendId);
     }
@@ -2532,10 +3311,27 @@
       return;
     }
 
+    if (event.target.matches("[data-onboarding-fund-custom]")) {
+      event.preventDefault();
+      const draft = syncOnboardingDraftFromDom();
+      if (addOnboardingFund(draft.customFund)) {
+        draft.customFund = "";
+        draft.customFundOpen = false;
+        app();
+      }
+      return;
+    }
+
     const row = event.target.closest("[data-onboarding-row-index]");
     if (row && row.dataset.onboardingEditing === "true") {
       event.preventDefault();
       if (finishOnboardingRowEdit(Number(row.dataset.onboardingRowIndex))) app();
+    }
+
+    const fundRow = event.target.closest("[data-onboarding-fund-row-index]");
+    if (fundRow && fundRow.dataset.onboardingFundEditing === "true") {
+      event.preventDefault();
+      if (finishOnboardingFundEdit(Number(fundRow.dataset.onboardingFundRowIndex))) app();
     }
   }
 
@@ -2614,6 +3410,27 @@
     if (friendForm) {
       event.preventDefault();
       await createFriend(friendForm);
+      return;
+    }
+
+    const bucketForm = event.target.closest("[data-form='bucket']");
+    if (bucketForm) {
+      event.preventDefault();
+      await saveBucket(bucketForm);
+      return;
+    }
+
+    const fundForm = event.target.closest("[data-form='fund']");
+    if (fundForm) {
+      event.preventDefault();
+      await createFund(fundForm);
+      return;
+    }
+
+    const fundCardForm = event.target.closest("[data-form='fund-card']");
+    if (fundCardForm) {
+      event.preventDefault();
+      await saveFundCard(fundCardForm);
       return;
     }
 
@@ -2820,26 +3637,42 @@
 
   async function saveOnboarding(form) {
     const draft = syncOnboardingDraftFromDom();
+    const bucketTotal = Number(draft.bucketTotal || 0);
     const monthlyIncome = Number(draft.monthlyIncome || 0);
     const currency = currencyOptions[draft.currency] ? draft.currency : "VND";
+    const fundRows = draft.fundRows.map((row) => ({
+      name: String(row.name || "").trim(),
+      target: Number(row.target || 0),
+      saved: Number(row.saved || 0)
+    })).filter((row) => row.name && !isAutomaticFundName(row.name));
     const rows = draft.rows.map((row) => ({
       category: localizeCategoryName(row.category),
       minimum: Number(row.minimum || 0),
       full: Number(row.full || 0)
     })).filter((row) => row.category);
 
-    if (!Number.isFinite(monthlyIncome) || rows.some((row) => !Number.isFinite(row.minimum) || !Number.isFinite(row.full))) {
+    if (!Number.isFinite(bucketTotal) || !Number.isFinite(monthlyIncome) || fundRows.some((row) => !Number.isFinite(row.target) || !Number.isFinite(row.saved)) || rows.some((row) => !Number.isFinite(row.minimum) || !Number.isFinite(row.full))) {
       showToast("Hãy nhập số tiền hợp lệ.");
       return;
     }
 
-    if (monthlyIncome < 0 || rows.some((row) => row.minimum < 0 || row.full < 0)) {
+    if (bucketTotal < 0 || monthlyIncome < 0 || fundRows.some((row) => row.target < 0 || row.saved < 0) || rows.some((row) => row.minimum < 0 || row.full < 0)) {
       showToast("Các số tiền không được nhỏ hơn 0.");
+      return;
+    }
+
+    if (hasDuplicateOnboardingFunds(fundRows)) {
+      showToast("Danh sách Quỹ có tên bị trùng.");
       return;
     }
 
     try {
       const month = state.money.filters.month || currentMonth();
+      await apiRequest("/api/money/bucket", {
+        method: "PUT",
+        body: { total_amount: String(bucketTotal) }
+      });
+      await upsertOnboardingFunds(fundRows);
       await ensureBudgetCategories(rows.map((row) => row.category));
       await Promise.all(rows.map((row, index) => (
         apiRequest("/api/money/budgets", {
@@ -2909,6 +3742,33 @@
     )));
   }
 
+  async function upsertOnboardingFunds(funds) {
+    const existingFunds = await apiRequest("/api/money/funds");
+    const customFunds = funds.filter((fund) => !isAutomaticFundName(fund.name));
+    const byName = new Map(existingFunds
+      .filter((fund) => !isAutomaticFundName(fund.name))
+      .map((fund) => [String(fund.name || "").toLowerCase(), fund]));
+    await Promise.all(customFunds.map((fund, index) => {
+      const existing = byName.get(fund.name.toLowerCase());
+      const payload = {
+        name: fund.name,
+        target_amount: String(fund.target),
+        saved_amount: String(fund.saved),
+        color: fundColors[index % fundColors.length]
+      };
+      if (existing) {
+        return apiRequest(`/api/money/funds/${encodeURIComponent(existing.id)}`, {
+          method: "PATCH",
+          body: { ...payload, color: existing.color || payload.color }
+        });
+      }
+      return apiRequest("/api/money/funds", {
+        method: "POST",
+        body: payload
+      });
+    }));
+  }
+
   async function submitGameGuess(form) {
     const formData = new FormData(form);
     const word = String(formData.get("word") || "").trim().toLowerCase();
@@ -2938,6 +3798,27 @@
         renderActiveModule();
       }
     }
+  }
+
+  function applyGameKey(key) {
+    const input = document.querySelector("[data-game-guess-input]");
+    const form = document.querySelector("[data-form='game-guess']");
+    if (!input || input.disabled) return;
+
+    const normalizedKey = String(key || "");
+    if (normalizedKey === "enter") {
+      form?.requestSubmit();
+      return;
+    }
+
+    const current = String(input.value || "").toUpperCase();
+    if (normalizedKey === "backspace") {
+      input.value = current.slice(0, -1);
+    } else if (/^[A-Z]$/.test(normalizedKey) && current.length < 5) {
+      input.value = `${current}${normalizedKey}`;
+    }
+    gameSync.guessDraft = input.value;
+    input.focus();
   }
 
   async function apiRequest(path, options = {}) {
@@ -3080,6 +3961,9 @@
     if (detail === "Category already exists") return "Danh mục này đã tồn tại.";
     if (detail === "Category is in use") return "Danh mục đang được dùng trong giao dịch hoặc ngân sách.";
     if (detail === "Category not found") return "Không tìm thấy danh mục.";
+    if (detail === "Fund already exists") return "Quỹ này đã tồn tại.";
+    if (detail === "System fund is automatic") return "Quỹ này được tự động tính từ ngân sách.";
+    if (detail === "Fund not found") return "Không tìm thấy Quỹ.";
     if (detail === "Friend user not found") return "Không tìm thấy người dùng này.";
     if (detail === "Cannot add yourself as a friend") return "Bạn không thể thêm chính mình.";
     if (detail === "Friend already exists") return "Người này đã có trong danh sách bạn bè.";
@@ -3090,6 +3974,7 @@
     if (detail === "Today's game is already complete") return "Bạn đã hoàn thành Wordle hôm nay.";
     if (detail === "No guesses remaining") return "Bạn đã hết lượt đoán hôm nay.";
     if (detail === "Guess is not in the word pool") return "Từ này không nằm trong bộ từ của game.";
+    if (detail === "Guess is not a valid English word") return "Từ này chưa được nhận diện là từ tiếng Anh hợp lệ.";
     if (detail === "You already guessed this word") return "Bạn đã đoán từ này rồi.";
     if (detail === "Unsupported avatar image type") return "Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc GIF.";
     if (detail === "Avatar file is empty") return "Tệp ảnh không có nội dung.";
@@ -3247,6 +4132,106 @@
       showToast("Đã xóa danh mục.");
     } catch (error) {
       showToast(error.message || "Không thể xóa danh mục.");
+    }
+  }
+
+  async function saveBucket(form) {
+    const formData = new FormData(form);
+    const total = Number(formData.get("total_amount") || 0);
+    if (!Number.isFinite(total) || total < 0) {
+      showToast("Hãy nhập tổng tiền hợp lệ.");
+      return;
+    }
+
+    try {
+      const bucket = await apiRequest("/api/money/bucket", {
+        method: "PUT",
+        body: { total_amount: String(total) }
+      });
+      state.money.bucket = bucketRecordFromApi(bucket);
+      saveAndRender("Đã lưu Túi tiền.");
+    } catch (error) {
+      showToast(error.message || "Không thể lưu Túi tiền.");
+    }
+  }
+
+  async function createFund(form) {
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    const target = Number(formData.get("target_amount") || 0);
+    const saved = Number(formData.get("saved_amount") || 0);
+    if (!name || !Number.isFinite(target) || !Number.isFinite(saved) || target < 0 || saved < 0) {
+      showToast("Hãy nhập tên quỹ và số tiền hợp lệ.");
+      return;
+    }
+    if (isAutomaticFundName(name)) {
+      showToast("Quỹ này được tự động tính từ ngân sách.");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/money/funds", {
+        method: "POST",
+        body: {
+          name,
+          target_amount: String(target),
+          saved_amount: String(saved),
+          color: fundColors[state.money.funds.length % fundColors.length]
+        }
+      });
+      form.reset();
+      await loadMoneyFromApi();
+      showToast("Đã thêm Quỹ.");
+    } catch (error) {
+      showToast(error.message || "Không thể thêm Quỹ.");
+    }
+  }
+
+  async function saveFundCard(form) {
+    const id = form.dataset.fundId;
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    const target = Number(formData.get("target_amount") || 0);
+    const saved = Number(formData.get("saved_amount") || 0);
+    const color = normalizeFundColor(formData.get("color"));
+    if (!id || !name || !Number.isFinite(target) || !Number.isFinite(saved) || target < 0 || saved < 0) {
+      showToast("Hãy nhập thông tin Quỹ hợp lệ.");
+      return;
+    }
+    if (isAutomaticFundName(name)) {
+      showToast("Quỹ này được tự động tính từ ngân sách.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/funds/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: {
+          name,
+          target_amount: String(target),
+          saved_amount: String(saved),
+          color
+        }
+      });
+      await loadMoneyFromApi();
+      showToast("Đã lưu Quỹ.");
+    } catch (error) {
+      showToast(error.message || "Không thể lưu Quỹ.");
+    }
+  }
+
+  async function deleteFund(id) {
+    if (!id) {
+      showToast("Quỹ chưa sẵn sàng để xóa.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/money/funds/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await loadMoneyFromApi();
+      showToast("Đã xóa Quỹ.");
+    } catch (error) {
+      showToast(error.message || "Không thể xóa Quỹ.");
     }
   }
 

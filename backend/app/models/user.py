@@ -22,5 +22,7 @@ class User(Base):
 
     transactions = relationship("Transaction", back_populates="owner", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="owner", cascade="all, delete-orphan")
+    money_bucket = relationship("MoneyBucket", back_populates="owner", cascade="all, delete-orphan", uselist=False)
     money_categories = relationship("MoneyCategory", back_populates="owner", cascade="all, delete-orphan")
+    money_funds = relationship("MoneyFund", back_populates="owner", cascade="all, delete-orphan")
     wordle_attempts = relationship("WordleAttempt", back_populates="owner", cascade="all, delete-orphan")

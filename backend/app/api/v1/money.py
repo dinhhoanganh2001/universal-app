@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.money import Budget, MoneyCategory, Transaction
+from app.models.money import Budget, MoneyBucket, MoneyCategory, MoneyFund, Transaction
 from app.models.user import User
 from app.schemas.money import (
+    BucketRead,
+    BucketUpdate,
     BudgetRead,
     BudgetUpdate,
     BudgetUpsert,
@@ -17,6 +19,9 @@ from app.schemas.money import (
     CategoryRead,
     CategorySpend,
     CategoryUpdate,
+    FundCreate,
+    FundRead,
+    FundUpdate,
     MoneySummary,
     TransactionCreate,
     TransactionRead,
@@ -25,6 +30,121 @@ from app.schemas.money import (
 
 
 router = APIRouter()
+
+SYSTEM_FUND_NAMES = {
+    "quỹ khẩn cấp",
+    "quỹ độc lập tài chính",
+    "độc lập tài chính",
+    "quỹ tự do tài chính",
+    "tự do tài chính",
+}
+
+
+@router.get("/bucket", response_model=BucketRead)
+def get_bucket(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BucketRead:
+    bucket = get_or_create_bucket(db, current_user.id)
+    return BucketRead(id=bucket.id, total_amount=bucket.total_amount)
+
+
+@router.put("/bucket", response_model=BucketRead)
+def update_bucket(
+    payload: BucketUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BucketRead:
+    bucket = get_or_create_bucket(db, current_user.id)
+    bucket.total_amount = payload.total_amount
+    db.add(bucket)
+    db.commit()
+    db.refresh(bucket)
+    return BucketRead(id=bucket.id, total_amount=bucket.total_amount)
+
+
+@router.get("/funds", response_model=list[FundRead])
+def list_funds(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[FundRead]:
+    funds = list(
+        db.scalars(
+            select(MoneyFund)
+            .where(
+                MoneyFund.owner_id == current_user.id,
+                ~func.lower(MoneyFund.name).in_(SYSTEM_FUND_NAMES),
+            )
+            .order_by(MoneyFund.created_at.asc(), MoneyFund.id.asc())
+        )
+    )
+    return [fund_read(fund) for fund in funds]
+
+
+@router.post("/funds", response_model=FundRead, status_code=status.HTTP_201_CREATED)
+def create_fund(
+    payload: FundCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FundRead:
+    ensure_custom_fund_name(payload.name)
+    existing = db.scalar(
+        select(MoneyFund).where(
+            MoneyFund.owner_id == current_user.id,
+            MoneyFund.name == payload.name,
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Fund already exists")
+
+    fund = MoneyFund(owner_id=current_user.id, **payload.model_dump())
+    db.add(fund)
+    db.commit()
+    db.refresh(fund)
+    return fund_read(fund)
+
+
+@router.patch("/funds/{fund_id}", response_model=FundRead)
+def update_fund(
+    fund_id: int,
+    payload: FundUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FundRead:
+    fund = get_owned_fund(db, current_user.id, fund_id)
+    updates = payload.model_dump(exclude_unset=True)
+    next_name = updates.get("name")
+    if next_name:
+        ensure_custom_fund_name(next_name)
+    if next_name and next_name != fund.name:
+        existing = db.scalar(
+            select(MoneyFund).where(
+                MoneyFund.owner_id == current_user.id,
+                MoneyFund.name == next_name,
+                MoneyFund.id != fund.id,
+            )
+        )
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Fund already exists")
+
+    for field, value in updates.items():
+        setattr(fund, field, value)
+
+    db.add(fund)
+    db.commit()
+    db.refresh(fund)
+    return fund_read(fund)
+
+
+@router.delete("/funds/{fund_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_fund(
+    fund_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    fund = get_owned_fund(db, current_user.id, fund_id)
+    db.delete(fund)
+    db.commit()
 
 
 @router.get("/categories", response_model=list[CategoryRead])
@@ -380,6 +500,42 @@ def summary(
             for row in category_rows
         ],
         budgets=budget_reads(db, current_user.id, month),
+    )
+
+
+def get_or_create_bucket(db: Session, owner_id: int) -> MoneyBucket:
+    bucket = db.scalar(select(MoneyBucket).where(MoneyBucket.owner_id == owner_id))
+    if bucket:
+        return bucket
+
+    bucket = MoneyBucket(owner_id=owner_id, total_amount=Decimal("0.00"))
+    db.add(bucket)
+    db.commit()
+    db.refresh(bucket)
+    return bucket
+
+
+def get_owned_fund(db: Session, owner_id: int, fund_id: int) -> MoneyFund:
+    fund = db.scalar(select(MoneyFund).where(MoneyFund.id == fund_id, MoneyFund.owner_id == owner_id))
+    if not fund:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fund not found")
+    return fund
+
+
+def ensure_custom_fund_name(name: str) -> None:
+    if name.strip().lower() in SYSTEM_FUND_NAMES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System fund is automatic")
+
+
+def fund_read(fund: MoneyFund) -> FundRead:
+    percent_saved = round((fund.saved_amount / fund.target_amount) * 100) if fund.target_amount > 0 else 0
+    return FundRead(
+        id=fund.id,
+        name=fund.name,
+        target_amount=fund.target_amount,
+        saved_amount=fund.saved_amount,
+        color=fund.color,
+        percent_saved=percent_saved,
     )
 
 

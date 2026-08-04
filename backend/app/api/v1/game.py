@@ -74,8 +74,8 @@ def create_guess(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No guesses remaining")
 
     guess = payload.word
-    if guess not in word_pool():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guess is not in the word pool")
+    if guess not in valid_guess_words():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guess is not a valid English word")
     if any(row.get("word") == guess for row in attempt.guesses or []):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already guessed this word")
 
@@ -204,6 +204,13 @@ def word_pool() -> set[str]:
         if len(pool) >= SOURCE_WORD_COUNT:
             break
     return set(pool)
+
+
+@lru_cache(maxsize=1)
+def valid_guess_words() -> set[str]:
+    words = set(system_dictionary_words())
+    words.update(COMMON_ANSWER_WORDS)
+    return words or word_pool()
 
 
 def system_dictionary_words() -> list[str]:

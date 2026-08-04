@@ -16,6 +16,7 @@ def main() -> None:
 
     from fastapi.testclient import TestClient
 
+    from app.api.v1.game import answer_for_date, current_puzzle_date, valid_guess_words, word_pool
     from app.main import app
 
     client = TestClient(app)
@@ -80,6 +81,58 @@ def main() -> None:
     assert onboarding.status_code == 200, onboarding.text
     assert onboarding.json()["monthly_income"] == "2500.00", onboarding.text
     assert onboarding.json()["onboarding_completed"] is True, onboarding.text
+
+    empty_bucket = client.get("/api/money/bucket", headers=headers)
+    assert empty_bucket.status_code == 200, empty_bucket.text
+    assert empty_bucket.json()["total_amount"] == "0.00", empty_bucket.text
+
+    bucket = client.put("/api/money/bucket", headers=headers, json={"total_amount": "12500.00"})
+    assert bucket.status_code == 200, bucket.text
+    assert bucket.json()["total_amount"] == "12500.00", bucket.text
+
+    fund = client.post(
+        "/api/money/funds",
+        headers=headers,
+        json={
+            "name": "Emergency Fund",
+            "target_amount": "10000.00",
+            "saved_amount": "2500.00",
+            "color": "#0f766e",
+        },
+    )
+    assert fund.status_code == 201, fund.text
+    fund_payload = fund.json()
+    assert fund_payload["percent_saved"] == 25, fund_payload
+    fund_id = fund_payload["id"]
+
+    duplicate_fund = client.post(
+        "/api/money/funds",
+        headers=headers,
+        json={"name": "Emergency Fund", "target_amount": "1000.00"},
+    )
+    assert duplicate_fund.status_code == 409, duplicate_fund.text
+
+    automatic_fund = client.post(
+        "/api/money/funds",
+        headers=headers,
+        json={"name": "Quỹ khẩn cấp", "target_amount": "12000.00"},
+    )
+    assert automatic_fund.status_code == 400, automatic_fund.text
+
+    updated_fund = client.patch(
+        f"/api/money/funds/{fund_id}",
+        headers=headers,
+        json={"saved_amount": "5000.00", "target_amount": "10000.00"},
+    )
+    assert updated_fund.status_code == 200, updated_fund.text
+    assert updated_fund.json()["percent_saved"] == 50, updated_fund.text
+
+    funds = client.get("/api/money/funds", headers=headers)
+    assert funds.status_code == 200, funds.text
+    assert len(funds.json()) == 1, funds.text
+
+    deleted_fund = client.delete(f"/api/money/funds/{fund_id}", headers=headers)
+    assert deleted_fund.status_code == 204, deleted_fund.text
 
     password_update = client.patch(
         "/api/auth/password",
@@ -215,19 +268,28 @@ def main() -> None:
     assert game_payload["source_word_count"] == 3000, game_payload
     assert game_payload["status"] == "playing", game_payload
 
-    game_guess = client.post("/api/game/guesses", headers=headers, json={"word": "apple"})
+    outside_pool_guess = next(
+        word
+        for word in sorted(valid_guess_words() - word_pool())
+        if word != answer_for_date(current_puzzle_date())
+    )
+    game_guess = client.post("/api/game/guesses", headers=headers, json={"word": outside_pool_guess})
     assert game_guess.status_code == 200, game_guess.text
     game_guess_payload = game_guess.json()
     assert game_guess_payload["attempts_used"] == 1, game_guess_payload
     assert len(game_guess_payload["guesses"]) == 1, game_guess_payload
+    assert game_guess_payload["guesses"][0]["word"] == outside_pool_guess, game_guess_payload
     assert len(game_guess_payload["guesses"][0]["result"]) == 5, game_guess_payload
     assert any(player["user_id"] == demo_user_id for player in game_guess_payload["progress"]), game_guess_payload
     demo_game_progress = next(player for player in game_guess_payload["progress"] if player["user_id"] == demo_user_id)
     assert demo_game_progress["board"] == [game_guess_payload["guesses"][0]["result"]], game_guess_payload
     assert "word" not in demo_game_progress, demo_game_progress
 
-    duplicate_game_guess = client.post("/api/game/guesses", headers=headers, json={"word": "apple"})
+    duplicate_game_guess = client.post("/api/game/guesses", headers=headers, json={"word": outside_pool_guess})
     assert duplicate_game_guess.status_code == 409, duplicate_game_guess.text
+
+    invalid_game_guess = client.post("/api/game/guesses", headers=headers, json={"word": "zzzzz"})
+    assert invalid_game_guess.status_code == 400, invalid_game_guess.text
 
     category = client.post("/api/money/categories", headers=headers, json={"name": "Food"})
     assert category.status_code == 201, category.text
