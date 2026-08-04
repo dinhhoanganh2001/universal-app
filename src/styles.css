@@ -1127,6 +1127,34 @@ button:disabled {
   width: min(280px, 100%);
 }
 
+.friends-current-month {
+  min-width: 190px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: #ffffff;
+  text-align: right;
+}
+
+.friends-current-month span,
+.friends-current-month strong {
+  display: block;
+}
+
+.friends-current-month span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.friends-current-month strong {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
 .transaction-list {
   overflow-x: auto;
 }

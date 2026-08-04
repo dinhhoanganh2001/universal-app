@@ -1,13 +1,13 @@
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.v1.money import month_bounds
+from app.api.v1.money import budget_reads
 from app.db.session import get_db
-from app.models.money import Budget, Transaction
 from app.models.social import Friendship
 from app.models.user import User
 from app.schemas.social import FriendCreate, FriendList, FriendRead, FriendRequestRead
@@ -18,10 +18,11 @@ router = APIRouter()
 
 @router.get("", response_model=FriendList)
 def list_friends(
-    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FriendList:
+    progress_month = current_month_key()
     rows = list(
         db.scalars(
             select(Friendship)
@@ -56,7 +57,7 @@ def list_friends(
         if friend_user.id in seen_friend_ids:
             continue
         seen_friend_ids.add(friend_user.id)
-        accepted_friends.append(friend_read(db, friend_user, month))
+        accepted_friends.append(friend_read(db, friend_user, progress_month))
 
     incoming_requests = []
     outgoing_requests = []
@@ -76,7 +77,8 @@ def list_friends(
             outgoing_requests.append(request)
 
     return FriendList(
-        month=month,
+        month=progress_month,
+        self=friend_read(db, current_user, progress_month),
         friends=accepted_friends,
         incoming_requests=incoming_requests,
         outgoing_requests=outgoing_requests,
@@ -116,7 +118,7 @@ def create_friend(
 @router.post("/requests/{request_id}/accept", response_model=FriendRead)
 def accept_friend_request(
     request_id: int,
-    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FriendRead:
@@ -128,7 +130,7 @@ def accept_friend_request(
     db.add(friendship)
     db.commit()
     db.refresh(friendship)
-    return friend_read(db, other_friend_user(db, friendship, current_user.id), month)
+    return friend_read(db, other_friend_user(db, friendship, current_user.id), current_month_key())
 
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -169,13 +171,14 @@ def find_friend_user(db: Session, identifier: str) -> User | None:
 
 
 def friend_read(db: Session, friend_user: User, month: str) -> FriendRead:
+    budget_percent_used, budget_count = friend_budget_stats(db, friend_user.id, month)
     return FriendRead(
         id=friend_user.id,
         email=friend_user.email,
         full_name=friend_user.full_name,
         avatar_url=friend_user.avatar_url,
-        budget_percent_used=friend_budget_percent(db, friend_user.id, month),
-        budget_count=friend_budget_count(db, friend_user.id, month),
+        budget_percent_used=budget_percent_used,
+        budget_count=budget_count,
     )
 
 
@@ -237,39 +240,15 @@ def other_friend_user(db: Session, friendship: Friendship, current_user_id: int)
     return user
 
 
-def friend_budget_count(db: Session, owner_id: int, month: str) -> int:
-    return db.scalar(
-        select(func.count()).select_from(Budget).where(
-            Budget.owner_id == owner_id,
-            Budget.month == month,
-        )
-    ) or 0
-
-
-def friend_budget_percent(db: Session, owner_id: int, month: str) -> int:
-    total_limit = db.scalar(
-        select(func.coalesce(func.sum(Budget.limit_amount), 0)).where(
-            Budget.owner_id == owner_id,
-            Budget.month == month,
-        )
-    )
-    limit_amount = Decimal(total_limit or 0)
+def friend_budget_stats(db: Session, owner_id: int, month: str) -> tuple[int, int]:
+    budgets = budget_reads(db, owner_id, month)
+    limit_amount = sum((budget.limit_amount for budget in budgets), Decimal("0"))
     if limit_amount <= 0:
-        return 0
+        return 0, len(budgets)
 
-    start, end = month_bounds(month)
-    budget_categories = select(Budget.category).where(
-        Budget.owner_id == owner_id,
-        Budget.month == month,
-    )
-    total_spent = db.scalar(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.owner_id == owner_id,
-            Transaction.type == "expense",
-            Transaction.category.in_(budget_categories),
-            Transaction.occurred_on >= start,
-            Transaction.occurred_on < end,
-        )
-    )
-    spent_amount = Decimal(total_spent or 0)
-    return round((spent_amount / limit_amount) * 100)
+    spent_amount = sum((budget.spent_amount for budget in budgets), Decimal("0"))
+    return round((spent_amount / limit_amount) * 100), len(budgets)
+
+
+def current_month_key() -> str:
+    return date.today().strftime("%Y-%m")

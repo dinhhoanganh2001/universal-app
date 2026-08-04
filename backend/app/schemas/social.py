@@ -30,6 +30,7 @@ class FriendRequestRead(BaseModel):
 
 class FriendList(BaseModel):
     month: str
+    self: FriendRead
     friends: list[FriendRead]
     incoming_requests: list[FriendRequestRead] = Field(default_factory=list)
     outgoing_requests: list[FriendRequestRead] = Field(default_factory=list)

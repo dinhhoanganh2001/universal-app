@@ -126,6 +126,31 @@
   ];
   const featureAnnouncements = [
     {
+      id: "friends-current-month-progress-2026-08-04",
+      badge: "Cải tiến mới",
+      title: "Bạn bè chỉ hiển thị tiến độ tháng hiện tại",
+      timestamp: "2026-08-04T21:23:05+07:00",
+      timeLabel: "2026-08-04 21:23:05 +07",
+      summary: "Danh sách Bạn bè giờ chỉ dùng tiến độ ngân sách tháng hiện tại và đồng bộ cùng một cách tính cho mọi người.",
+      purpose: [
+        "Tránh việc mỗi người chọn một tháng khác nhau rồi nhìn thấy phần trăm tiến độ không giống nhau.",
+        "Đảm bảo dòng của bạn và dòng bạn bè cùng dùng dữ liệu tháng hiện tại từ máy chủ.",
+        "Giữ danh sách Bạn bè tập trung vào so sánh tiến độ hiện tại, không phải lịch sử ngân sách."
+      ],
+      recommended: [
+        "Dùng khi bạn muốn xem nhanh ai đang dùng bao nhiêu phần trăm ngân sách trong tháng này.",
+        "Dùng khi cần so sánh với bạn bè mà không cần đổi tháng hoặc nhớ đang xem tháng nào."
+      ],
+      howTo: [
+        "Mở tab Bạn bè.",
+        "Ứng dụng tự tải tiến độ tháng hiện tại từ máy chủ.",
+        "Xem thanh tiến độ của bạn và bạn bè; mọi người sẽ thấy cùng một phần trăm cho cùng một người.",
+        "Muốn xem tháng khác thì dùng tab Ngân sách của chính bạn, không dùng danh sách Bạn bè."
+      ],
+      ctaLabel: "Mở Bạn bè",
+      moduleId: "friends"
+    },
+    {
       id: "game-wordle-phase2-2026-08-04",
       badge: "Tính năng GAME",
       title: "GAME Wordle có bàn phím ảo và kiểm tra từ tốt hơn",
@@ -225,6 +250,29 @@
         "Bấm vào dòng thông báo hoặc chữ Xem chi tiết để mở trang chi tiết đầy đủ.",
         "Bấm Danh sách thông báo để quay lại danh sách ngắn."
       ]
+    },
+    {
+      id: "freedom-time-uses-bucket-2026-08-04",
+      badge: "Cải tiến mới",
+      title: "Thời gian tự do tài chính đã tính Túi tiền hiện có",
+      timestamp: "2026-08-04T17:40:23+07:00",
+      timeLabel: "2026-08-04 17:40:23 +07",
+      summary: "Ước tính Độc lập tài chính và Tự do tài chính giờ trừ số tiền đã có trong Túi tiền trước khi tính thời gian còn lại.",
+      purpose: [
+        "Làm thời gian ước tính thực tế hơn vì người dùng đã có sẵn một phần tài sản.",
+        "Tránh tính lại từ con số 0 khi người dùng đã nhập Túi tiền."
+      ],
+      recommended: [
+        "Dùng khi bạn đã nhập tổng tiền hiện có trong Túi tiền.",
+        "Dùng để xem còn bao lâu nữa tới Độc lập tài chính hoặc Tự do tài chính sau khi trừ tài sản hiện có."
+      ],
+      howTo: [
+        "Mở tab Túi tiền và nhập Tổng tiền hiện có.",
+        "Thiết lập Chi tiêu tối thiểu, Chi tiêu đầy đủ và Thu nhập tháng.",
+        "Xem các thẻ Độc lập tài chính và Tự do tài chính trong Ngân sách hoặc onboarding; thời gian sẽ tính theo mục tiêu còn lại."
+      ],
+      ctaLabel: "Mở Túi tiền",
+      moduleId: "funds"
     }
   ];
 
@@ -266,6 +314,7 @@
     loading: false,
     month: "",
     error: "",
+    self: null,
     items: [],
     incoming: [],
     outgoing: []
@@ -1249,12 +1298,13 @@
 
   function renderOnboardingEstimates(draft, formatter) {
     const monthlyIncome = Number(draft.monthlyIncome || 0);
+    const currentAmount = Number(draft.bucketTotal || 0);
     const minimumBudget = draft.rows.reduce((sum, row) => sum + Number(row.minimum || 0), 0);
     const fullBudget = draft.rows.reduce((sum, row) => sum + Number(row.full || 0), 0);
     return `
-      ${onboardingEstimateCard("Quỹ khẩn cấp", "12 tháng Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12), formatter)}
-      ${onboardingEstimateCard("Quỹ độc lập tài chính", "25 năm Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12 * 25), formatter)}
-      ${onboardingEstimateCard("Quỹ tự do tài chính", "25 năm Chi tiêu đầy đủ", targetSavingsEstimate(monthlyIncome, fullBudget, 12 * 25), formatter)}
+      ${onboardingEstimateCard("Quỹ khẩn cấp", "12 tháng Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12, currentAmount), formatter)}
+      ${onboardingEstimateCard("Quỹ độc lập tài chính", "25 năm Chi tiêu tối thiểu", targetSavingsEstimate(monthlyIncome, minimumBudget, 12 * 25, currentAmount), formatter)}
+      ${onboardingEstimateCard("Quỹ tự do tài chính", "25 năm Chi tiêu đầy đủ", targetSavingsEstimate(monthlyIncome, fullBudget, 12 * 25, currentAmount), formatter)}
     `;
   }
 
@@ -1266,7 +1316,7 @@
           <strong>${escapeHtml(title)}</strong>
         </div>
         <div class="onboarding-estimate-time">${escapeHtml(formatFreedomTime(estimate))}</div>
-        <small>Mục tiêu ${formatter.format(estimate.target)} · Tiết kiệm ${formatter.format(estimate.monthlySavings)}/tháng</small>
+        <small>Mục tiêu ${formatter.format(estimate.target)} · Còn lại ${formatter.format(estimate.remainingTarget)} · Tiết kiệm ${formatter.format(estimate.monthlySavings)}/tháng</small>
       </article>
     `;
   }
@@ -1673,6 +1723,7 @@
         <div class="freedom-time">${escapeHtml(formatFreedomTime(estimate))}</div>
         <div class="freedom-meta">
           <span>Mục tiêu ${formatter.format(estimate.target)}</span>
+          <span>Còn lại ${formatter.format(estimate.remainingTarget)}</span>
           <span>Tiết kiệm ${formatter.format(estimate.monthlySavings)}/tháng</span>
         </div>
       </article>
@@ -1681,6 +1732,7 @@
 
   function formatFreedomTime(estimate) {
     if (estimate.monthlyBudget <= 0) return "Cần thiết lập ngân sách";
+    if (estimate.remainingTarget <= 0 && estimate.target > 0) return "Đã đạt mục tiêu";
     if (estimate.monthlyIncome <= 0) return "Cần nhập thu nhập";
     if (estimate.monthlySavings <= 0) return "Chưa có thặng dư";
 
@@ -2154,19 +2206,20 @@
   }
 
   function renderFriends() {
-    const month = state.money.filters.month || currentMonth();
-    const friendItems = uniqueFriends([selfFriendComparison(getMoneyViewData()), ...friendsSync.items]);
+    const month = friendsSync.month || currentMonth();
+    const selfItem = friendsSync.self ? { ...friendsSync.self, is_self: true } : selfFriendComparison(getMoneyViewData());
+    const friendItems = uniqueFriends([selfItem, ...friendsSync.items]);
+    const monthLabel = new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${month}-01T12:00:00`));
     return `
       <section class="topbar">
         <div>
           <p class="eyebrow">Bạn bè</p>
           <h1>Theo dõi tiến độ ngân sách</h1>
-          <p>Gửi lời mời bằng email hoặc ID. Bạn bè cần chấp nhận trước khi hai bên nhìn thấy phần trăm tiến độ ngân sách.</p>
+          <p>Gửi lời mời bằng email hoặc ID. Danh sách này chỉ hiển thị tiến độ ngân sách tháng hiện tại để mọi người nhìn cùng một dữ liệu.</p>
         </div>
-        <div class="month-control compact-month">
-          <button type="button" data-action="previous-friends-month" title="Tháng trước">${svgIcon("chevronLeft")}</button>
-          <input type="month" data-filter="month" value="${escapeAttr(month)}">
-          <button type="button" data-action="next-friends-month" title="Tháng sau">${svgIcon("chevronRight")}</button>
+        <div class="friends-current-month">
+          <span>Tháng hiện tại</span>
+          <strong>${escapeHtml(monthLabel)}</strong>
         </div>
       </section>
 
@@ -2550,6 +2603,7 @@
     const remainingBudget = totalLimit - expenses;
     const overBudgetCount = budgetProgress.filter((budget) => Number(budget.percent || 0) >= 100).length;
     const monthlyIncome = Number(auth.user?.monthly_income || 0);
+    const currentAmount = Number(state.money.bucket?.total || 0);
     const minimumMonthlyBudget = budgetProgress.reduce((sum, budget) => sum + Number(budget.minimum || budget.limit || 0), 0);
     const fullMonthlyBudget = budgetProgress.reduce((sum, budget) => sum + Number(budget.full || budget.limit || 0), 0);
 
@@ -2565,8 +2619,8 @@
       budgetProgress,
       minimumMonthlyBudget,
       fullMonthlyBudget,
-      minimumFreedom: financialFreedomEstimate(monthlyIncome, minimumMonthlyBudget),
-      fullFreedom: financialFreedomEstimate(monthlyIncome, fullMonthlyBudget)
+      minimumFreedom: financialFreedomEstimate(monthlyIncome, minimumMonthlyBudget, currentAmount),
+      fullFreedom: financialFreedomEstimate(monthlyIncome, fullMonthlyBudget, currentAmount)
     };
   }
 
@@ -2590,22 +2644,26 @@
     });
   }
 
-  function financialFreedomEstimate(monthlyIncome, monthlyBudget) {
-    return targetSavingsEstimate(monthlyIncome, monthlyBudget, 12 * 25);
+  function financialFreedomEstimate(monthlyIncome, monthlyBudget, currentAmount = 0) {
+    return targetSavingsEstimate(monthlyIncome, monthlyBudget, 12 * 25, currentAmount);
   }
 
-  function targetSavingsEstimate(monthlyIncome, monthlyBudget, targetMonths) {
+  function targetSavingsEstimate(monthlyIncome, monthlyBudget, targetMonths, currentAmount = 0) {
     const safeIncome = Math.max(0, Number(monthlyIncome || 0));
     const safeBudget = Math.max(0, Number(monthlyBudget || 0));
     const safeTargetMonths = Math.max(0, Number(targetMonths || 0));
+    const safeCurrentAmount = Math.max(0, Number(currentAmount || 0));
     const monthlySavings = safeIncome - safeBudget;
     const target = safeBudget * safeTargetMonths;
+    const remainingTarget = Math.max(0, target - safeCurrentAmount);
     return {
       monthlyIncome: safeIncome,
       monthlyBudget: safeBudget,
+      currentAmount: safeCurrentAmount,
       monthlySavings,
       target,
-      months: monthlySavings > 0 && target > 0 ? Math.ceil(target / monthlySavings) : 0
+      remainingTarget,
+      months: monthlySavings > 0 && remainingTarget > 0 ? Math.ceil(remainingTarget / monthlySavings) : 0
     };
   }
 
@@ -2737,7 +2795,7 @@
 
   async function ensureFriendsLoaded() {
     if (!auth.token || activeModuleId !== "friends" || friendsSync.loading) return;
-    if (friendsSync.loaded && friendsSync.month === state.money.filters.month) return;
+    if (friendsSync.loaded && friendsSync.month === currentMonth()) return;
     await loadFriendsFromApi();
   }
 
@@ -2833,8 +2891,10 @@
     renderActiveModule();
 
     try {
-      const month = state.money.filters.month || currentMonth();
-      const payload = await apiRequest(`/api/friends?month=${encodeURIComponent(month)}`);
+      const month = currentMonth();
+      const payload = await apiRequest("/api/friends");
+      const selfFriend = normalizeFriend(payload.self);
+      friendsSync.self = selfFriend ? { ...selfFriend, is_self: true } : null;
       friendsSync.items = uniqueFriends(Array.isArray(payload.friends) ? payload.friends.map(normalizeFriend).filter(Boolean) : []);
       friendsSync.incoming = uniqueFriendRequests(Array.isArray(payload.incoming_requests) ? payload.incoming_requests.map(normalizeFriendRequest).filter(Boolean) : []);
       friendsSync.outgoing = uniqueFriendRequests(Array.isArray(payload.outgoing_requests) ? payload.outgoing_requests.map(normalizeFriendRequest).filter(Boolean) : []);
@@ -3351,17 +3411,6 @@
       ensureMoneyLoaded();
     }
 
-    if (action === "previous-friends-month" || action === "next-friends-month") {
-      state.money.filters.month = shiftMonth(
-        state.money.filters.month || currentMonth(),
-        action === "previous-friends-month" ? -1 : 1
-      );
-      friendsSync.loaded = false;
-      saveState();
-      renderActiveModule();
-      ensureFriendsLoaded();
-    }
-
     if (action === "logout") {
       auth.token = "";
       auth.user = null;
@@ -3374,6 +3423,10 @@
       gameSync.data = null;
       gameSync.guessDraft = "";
       stopGamePolling();
+      friendsSync.self = null;
+      friendsSync.items = [];
+      friendsSync.incoming = [];
+      friendsSync.outgoing = [];
       onboardingDraft = null;
       onboardingActive = false;
       clearOnboardingDraft();
@@ -4452,7 +4505,7 @@
     }
 
     try {
-      await apiRequest(`/api/friends/requests/${encodeURIComponent(id)}/accept?month=${encodeURIComponent(state.money.filters.month || currentMonth())}`, { method: "POST" });
+      await apiRequest(`/api/friends/requests/${encodeURIComponent(id)}/accept`, { method: "POST" });
       friendsSync.loaded = false;
       await loadFriendsFromApi();
       showToast("Đã chấp nhận lời mời.");

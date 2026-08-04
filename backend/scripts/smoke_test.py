@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -170,11 +171,13 @@ def main() -> None:
     )
     assert friend_login.status_code == 200, friend_login.text
     friend_headers = {"Authorization": f"Bearer {friend_login.json()['access_token']}"}
+    current_friend_month = date.today().strftime("%Y-%m")
+    previous_friend_month = previous_month_key(current_friend_month)
 
     friend_budget = client.put(
         "/api/money/budgets",
         headers=friend_headers,
-        json={"category": "Food", "month": "2026-07", "limit_amount": "100.00"},
+        json={"category": "Food", "month": previous_friend_month, "limit_amount": "100.00"},
     )
     assert friend_budget.status_code == 200, friend_budget.text
     friend_transaction = client.post(
@@ -185,7 +188,7 @@ def main() -> None:
             "category": "Food",
             "note": "Lunch",
             "amount": "75.00",
-            "occurred_on": "2026-07-28",
+            "occurred_on": f"{current_friend_month}-02",
         },
     )
     assert friend_transaction.status_code == 201, friend_transaction.text
@@ -208,14 +211,14 @@ def main() -> None:
     id_friend_headers = {"Authorization": f"Bearer {id_friend_login.json()['access_token']}"}
 
     self_friend = client.post(
-        "/api/friends?month=2026-07",
+        "/api/friends",
         headers=headers,
         json={"identifier": str(demo_user_id)},
     )
     assert self_friend.status_code == 400, self_friend.text
 
     friend_request = client.post(
-        "/api/friends?month=2026-07",
+        "/api/friends",
         headers=headers,
         json={"identifier": "friend@example.com"},
     )
@@ -224,36 +227,40 @@ def main() -> None:
     assert friend_request_payload["user_id"] == friend_user_id, friend_request_payload
     assert friend_request_payload["direction"] == "outgoing", friend_request_payload
 
-    pending_friends = client.get("/api/friends?month=2026-07", headers=headers)
+    pending_friends = client.get(f"/api/friends?month={previous_friend_month}", headers=headers)
     assert pending_friends.status_code == 200, pending_friends.text
+    assert pending_friends.json()["month"] == current_friend_month, pending_friends.text
+    assert pending_friends.json()["self"]["id"] == demo_user_id, pending_friends.text
     assert len(pending_friends.json()["friends"]) == 0, pending_friends.text
     assert len(pending_friends.json()["outgoing_requests"]) == 1, pending_friends.text
 
     accepted_friend = client.post(
-        f"/api/friends/requests/{friend_request_payload['request_id']}/accept?month=2026-07",
+        f"/api/friends/requests/{friend_request_payload['request_id']}/accept",
         headers=friend_headers,
     )
     assert accepted_friend.status_code == 200, accepted_friend.text
 
     id_friend_request = client.post(
-        "/api/friends?month=2026-07",
+        "/api/friends",
         headers=headers,
         json={"identifier": str(id_friend_id)},
     )
     assert id_friend_request.status_code == 201, id_friend_request.text
     accepted_id_friend = client.post(
-        f"/api/friends/requests/{id_friend_request.json()['request_id']}/accept?month=2026-07",
+        f"/api/friends/requests/{id_friend_request.json()['request_id']}/accept",
         headers=id_friend_headers,
     )
     assert accepted_id_friend.status_code == 200, accepted_id_friend.text
 
-    friends = client.get("/api/friends?month=2026-07", headers=headers)
+    friends = client.get(f"/api/friends?month={previous_friend_month}", headers=headers)
     assert friends.status_code == 200, friends.text
     friends_payload = friends.json()
-    assert friends_payload["month"] == "2026-07", friends_payload
+    assert friends_payload["month"] == current_friend_month, friends_payload
+    assert friends_payload["self"]["id"] == demo_user_id, friends_payload
     assert len(friends_payload["friends"]) == 2, friends_payload
     added_friend_payload = next(friend for friend in friends_payload["friends"] if friend["id"] == friend_user_id)
     assert added_friend_payload["budget_percent_used"] == 75, added_friend_payload
+    assert added_friend_payload["budget_count"] == 1, added_friend_payload
     assert "spent_amount" not in added_friend_payload, added_friend_payload
     assert "limit_amount" not in added_friend_payload, added_friend_payload
 
@@ -402,6 +409,13 @@ def main() -> None:
 
     db_file.close()
     print("backend smoke test passed")
+
+
+def previous_month_key(month: str) -> str:
+    year, month_number = [int(part) for part in month.split("-")]
+    if month_number == 1:
+        return f"{year - 1}-12"
+    return f"{year}-{month_number - 1:02d}"
 
 
 if __name__ == "__main__":
