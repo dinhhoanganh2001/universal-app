@@ -2199,16 +2199,31 @@ tbody tr:hover {
 
 .notification-card {
   display: grid;
-  gap: 12px;
   border: 1px solid rgba(37, 99, 235, 0.14);
   border-left: 4px solid var(--blue);
   border-radius: var(--radius);
-  padding: 16px;
   background: linear-gradient(135deg, #ffffff, #f8fbff);
+  overflow: hidden;
 }
 
 .notification-card.read {
   border-left-color: var(--muted);
+}
+
+.notification-card-summary {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  padding: 16px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-card-summary:hover {
+  background: rgba(37, 99, 235, 0.04);
 }
 
 .notification-card-top {
@@ -2235,12 +2250,72 @@ tbody tr:hover {
   font-weight: 800;
 }
 
-.notification-card h3 {
-  margin-bottom: 0;
-  font-size: 20px;
+.notification-card-summary > strong {
+  font-size: 17px;
+  line-height: 1.25;
 }
 
-.notification-card p {
+.notification-summary-text {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.notification-read-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.notification-read-more svg {
+  width: 16px;
+  height: 16px;
+}
+
+.notification-detail-view {
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.notification-back-link {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.notification-back-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.notification-detail-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: linear-gradient(135deg, #ffffff, #f8fbff);
+}
+
+.notification-detail-card h3 {
+  margin-bottom: 0;
+  font-size: 22px;
+}
+
+.notification-card p,
+.notification-detail-card p {
   margin-bottom: 0;
   color: var(--muted);
 }

@@ -126,10 +126,38 @@
   ];
   const featureAnnouncements = [
     {
+      id: "game-wordle-phase2-2026-08-04",
+      badge: "Tính năng GAME",
+      title: "GAME Wordle có bàn phím ảo và kiểm tra từ tốt hơn",
+      timestamp: "2026-08-04T09:47:12+07:00",
+      timeLabel: "2026-08-04 09:47:12 +07",
+      summary: "Tab GAME có Wordle hằng ngày, tiến độ người chơi dạng bảng màu, bàn phím ảo và chấp nhận từ tiếng Anh hợp lệ ngoài bộ 3000 từ.",
+      purpose: [
+        "Tạo một game Wordle chung mỗi ngày để mọi người cùng đoán một đáp án.",
+        "Cho người chơi xem tiến độ của nhau mà không lộ chữ hoặc từ đã đoán.",
+        "Giúp thao tác dễ hơn bằng bàn phím ảo có màu gợi ý cho từng chữ."
+      ],
+      recommended: [
+        "Dùng khi bạn muốn chơi Wordle hằng ngày ngay trong app.",
+        "Dùng bàn phím ảo khi chơi bằng chuột hoặc trên màn hình cảm ứng.",
+        "Xem Tiến độ người chơi để biết người khác đã đi được bao nhiêu hàng mà vẫn giữ riêng tư đáp án."
+      ],
+      howTo: [
+        "Mở tab GAME.",
+        "Gõ từ tiếng Anh 5 chữ hoặc bấm bàn phím ảo.",
+        "Bấm ĐOÁN để gửi lượt đoán.",
+        "Dùng màu trên ô và bàn phím: xanh là đúng vị trí, cam là có chữ sai vị trí, xám là không có trong từ.",
+        "Theo dõi bảng màu của người chơi khác trong Tiến độ người chơi."
+      ],
+      ctaLabel: "Mở GAME",
+      moduleId: "game"
+    },
+    {
       id: "funds-bucket-automatic-2026-08-04",
       badge: "Tính năng mới",
       title: "Túi tiền và Quỹ dài hạn",
-      dateLabel: "04/08/2026",
+      timestamp: "2026-08-04T11:18:09+07:00",
+      timeLabel: "2026-08-04 11:18:09 +07",
       summary: "Theo dõi tổng tiền hiện có, mục tiêu tiết kiệm riêng, và ba quỹ chiến lược được tự động tính từ ngân sách.",
       purpose: [
         "Túi tiền giúp bạn ghi lại tổng số tiền đang có ở thời điểm hiện tại.",
@@ -149,6 +177,54 @@
       ],
       ctaLabel: "Mở Túi tiền",
       moduleId: "funds"
+    },
+    {
+      id: "onboarding-prefill-current-settings-2026-08-04",
+      badge: "Cải tiến mới",
+      title: "Thiết lập ngân sách lại không còn bắt đầu trống",
+      timestamp: "2026-08-04T17:08:19+07:00",
+      timeLabel: "2026-08-04 17:08:19 +07",
+      summary: "Khi mở lại thiết lập ngân sách từ Hồ sơ, ứng dụng sẽ điền sẵn Túi tiền, Quỹ riêng, thu nhập, tiền tệ và ngân sách hiện tại để bạn chỉ cần chỉnh phần muốn đổi.",
+      purpose: [
+        "Giảm việc phải nhớ lại từng hạn mức, thu nhập hoặc quỹ đã nhập trước đó.",
+        "Giúp bạn điều chỉnh ngân sách nhanh hơn khi chi phí sống, thu nhập hoặc mục tiêu thay đổi.",
+        "Giữ onboarding như một màn hình chỉnh sửa tổng thể, không chỉ là thiết lập lần đầu."
+      ],
+      recommended: [
+        "Dùng khi bạn vừa đổi mức chi tiêu tối thiểu hoặc chi tiêu đầy đủ cho nhiều danh mục.",
+        "Dùng khi thu nhập tháng thay đổi và bạn muốn các ước tính tài chính tự cập nhật.",
+        "Dùng khi muốn rà soát lại toàn bộ Túi tiền, Quỹ riêng và ngân sách mà không phải mở từng tab."
+      ],
+      howTo: [
+        "Mở Hồ sơ rồi chọn Thiết lập ngân sách lại.",
+        "Ứng dụng sẽ tải thiết lập hiện tại của tháng này và điền sẵn vào màn hình thiết lập.",
+        "Chỉnh các dòng cần thay đổi, thêm hoặc xóa danh mục/quỹ riêng nếu cần.",
+        "Bấm lưu để cập nhật Túi tiền, Quỹ riêng, thu nhập, tiền tệ và ngân sách tháng hiện tại."
+      ],
+      ctaLabel: "Mở Hồ sơ",
+      moduleId: "profile"
+    },
+    {
+      id: "compact-newest-feature-notifications-2026-08-04",
+      badge: "Cải tiến mới",
+      title: "Thông báo gọn hơn, mới nhất ở trên",
+      timestamp: "2026-08-04T17:10:20+07:00",
+      timeLabel: "2026-08-04 17:10:20 +07",
+      summary: "Thông báo tính năng giờ hiển thị ngắn gọn theo thứ tự mới nhất trước; bấm vào từng dòng để mở trang chi tiết đầy đủ.",
+      purpose: [
+        "Giúp bạn nhìn nhanh các cập nhật mới mà không phải đọc một khối nội dung dài ngay lập tức.",
+        "Giữ thông báo rõ ràng hơn khi ứng dụng có nhiều tính năng mới."
+      ],
+      recommended: [
+        "Dùng khi bạn chỉ muốn lướt nhanh tính năng mới sau khi đăng nhập.",
+        "Bấm vào thông báo có liên quan khi bạn muốn đọc mục đích, trường hợp nên dùng và cách dùng chi tiết mà không bị nội dung dài che mất phần còn lại."
+      ],
+      howTo: [
+        "Mở Thông báo ở thanh bên.",
+        "Xem các dòng thông báo ngắn, mới nhất nằm trên cùng.",
+        "Bấm vào dòng thông báo hoặc chữ Xem chi tiết để mở trang chi tiết đầy đủ.",
+        "Bấm Danh sách thông báo để quay lại danh sách ngắn."
+      ]
     }
   ];
 
@@ -211,6 +287,7 @@
   let onboardingDraft = null;
   let featureNotificationPanelOpen = false;
   let featureNotificationAutoChecked = false;
+  let openedFeatureAnnouncementId = "";
 
   const modules = [
     {
@@ -569,6 +646,14 @@
 
   function unreadFeatureAnnouncementCount() {
     return unreadFeatureAnnouncements().length;
+  }
+
+  function featureAnnouncementsForDisplay() {
+    return [...featureAnnouncements].sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  }
+
+  function featureAnnouncementById(id) {
+    return featureAnnouncements.find((announcement) => announcement.id === id) || null;
   }
 
   function markFeatureAnnouncementsRead() {
@@ -1217,6 +1302,50 @@
     return onboardingDraft;
   }
 
+  function onboardingDraftFromCurrentSettings() {
+    const budgetRows = (state.money.budgetRecords || []).map((budget) => ({
+      category: localizeCategoryName(budget.category),
+      minimum: String(Number(budget.minimum || budget.limit || 0)),
+      full: String(Number(budget.full || budget.limit || 0)),
+      editing: false
+    })).filter((row) => row.category);
+
+    return {
+      bucketTotal: String(Number(state.money.bucket?.total || 0)),
+      monthlyIncome: String(Number(auth.user?.monthly_income || 0)),
+      currency: auth.user?.currency || "VND",
+      customFund: "",
+      customFundOpen: false,
+      customCategory: "",
+      customCategoryOpen: false,
+      fundRows: (state.money.funds || []).map((fund) => ({
+        name: fund.name,
+        target: String(Number(fund.target || 0)),
+        saved: String(Number(fund.saved || 0)),
+        editing: false
+      })).filter((fund) => !isAutomaticFundName(fund.name)),
+      rows: budgetRows
+    };
+  }
+
+  async function startOnboardingFromCurrentSettings() {
+    try {
+      state.money.filters.month = currentMonth();
+      moneySync.loaded = false;
+      moneySync.budgetMonth = "";
+      saveState();
+      await loadMoneyFromApi();
+      if (!auth.token) return;
+      onboardingDraft = onboardingDraftFromCurrentSettings();
+      saveOnboardingDraft();
+      onboardingActive = true;
+      app();
+    } catch (error) {
+      if (error.authExpired) return;
+      showToast(error.message || "Không thể tải thiết lập hiện tại.");
+    }
+  }
+
   function syncOnboardingDraftFromDom() {
     const draft = ensureOnboardingDraft();
     const form = document.querySelector("[data-form='onboarding']");
@@ -1361,6 +1490,8 @@
   }
 
   function featureNotificationPanel() {
+    const openedAnnouncement = featureAnnouncementById(openedFeatureAnnouncementId);
+    const announcements = featureAnnouncementsForDisplay();
     return `
       <div class="notification-layer" role="dialog" aria-modal="true" aria-labelledby="feature-notification-title">
         <section class="notification-panel">
@@ -1373,10 +1504,13 @@
               ${svgIcon("close")}
             </button>
           </div>
-          <div class="notification-list">
-            ${featureAnnouncements.map(featureAnnouncementCard).join("")}
-          </div>
+          ${openedAnnouncement ? featureAnnouncementDetail(openedAnnouncement) : `
+            <div class="notification-list" data-feature-notification-list>
+              ${announcements.map(featureAnnouncementCard).join("")}
+            </div>
+          `}
           <div class="notification-actions">
+            ${openedAnnouncement ? `<button class="button secondary" type="button" data-action="back-feature-notifications">Danh sách</button>` : ""}
             <button class="button secondary" type="button" data-action="close-feature-notifications">Đã hiểu</button>
           </div>
         </section>
@@ -1387,21 +1521,42 @@
   function featureAnnouncementCard(announcement) {
     return `
       <article class="notification-card ${readFeatureNotificationIds.has(announcement.id) ? "read" : "unread"}">
-        <div class="notification-card-top">
-          <span>${escapeHtml(announcement.badge)}</span>
-          <small>${escapeHtml(announcement.dateLabel)}</small>
-        </div>
-        <h3>${escapeHtml(announcement.title)}</h3>
-        <p>${escapeHtml(announcement.summary)}</p>
-        ${featureAnnouncementSection("Mục đích", announcement.purpose)}
-        ${featureAnnouncementSection("Nên dùng khi", announcement.recommended)}
-        ${featureAnnouncementSection("Cách dùng", announcement.howTo)}
-        <div class="notification-card-actions">
-          <button class="button" type="button" data-action="open-feature-module" data-module-id="${escapeAttr(announcement.moduleId)}">
-            ${escapeHtml(announcement.ctaLabel)}
-          </button>
-        </div>
+        <button class="notification-card-summary" type="button" data-action="open-feature-announcement" data-announcement-id="${escapeAttr(announcement.id)}">
+          <span class="notification-card-top">
+            <span>${escapeHtml(announcement.badge)}</span>
+            <small>${escapeHtml(announcement.timeLabel)}</small>
+          </span>
+          <strong>${escapeHtml(announcement.title)}</strong>
+          <span class="notification-summary-text">${escapeHtml(announcement.summary)}</span>
+          <span class="notification-read-more">Xem chi tiết ${svgIcon("chevronRight")}</span>
+        </button>
       </article>
+    `;
+  }
+
+  function featureAnnouncementDetail(announcement) {
+    return `
+      <div class="notification-detail-view">
+        <button class="notification-back-link" type="button" data-action="back-feature-notifications">
+          ${svgIcon("chevronLeft")}Danh sách thông báo
+        </button>
+        <article class="notification-detail-card">
+          <div class="notification-card-top">
+            <span>${escapeHtml(announcement.badge)}</span>
+            <small>${escapeHtml(announcement.timeLabel)}</small>
+          </div>
+          <h3>${escapeHtml(announcement.title)}</h3>
+          <p>${escapeHtml(announcement.summary)}</p>
+          ${featureAnnouncementSection("Mục đích", announcement.purpose)}
+          ${featureAnnouncementSection("Nên dùng khi", announcement.recommended)}
+          ${featureAnnouncementSection("Cách dùng", announcement.howTo)}
+          ${announcement.ctaLabel && announcement.moduleId ? `<div class="notification-card-actions">
+            <button class="button" type="button" data-action="open-feature-module" data-module-id="${escapeAttr(announcement.moduleId)}">
+              ${escapeHtml(announcement.ctaLabel)}
+            </button>
+          </div>` : ""}
+        </article>
+      </div>
     `;
   }
 
@@ -1419,6 +1574,13 @@
   function renderActiveModule() {
     const module = modules.find((item) => item.id === activeModuleId);
     document.querySelector("#main").innerHTML = module.render();
+  }
+
+  function updateFeatureNotificationPanel() {
+    const existingPanel = document.querySelector(".notification-layer");
+    if (!existingPanel) return false;
+    existingPanel.outerHTML = featureNotificationPanel();
+    return true;
   }
 
   function renderMoney() {
@@ -3030,18 +3192,31 @@
 
     if (action === "open-feature-notifications") {
       featureNotificationPanelOpen = true;
+      openedFeatureAnnouncementId = "";
       app();
+    }
+
+    if (action === "open-feature-announcement") {
+      openedFeatureAnnouncementId = actionTarget.dataset.announcementId || "";
+      if (!updateFeatureNotificationPanel()) app();
+    }
+
+    if (action === "back-feature-notifications") {
+      openedFeatureAnnouncementId = "";
+      if (!updateFeatureNotificationPanel()) app();
     }
 
     if (action === "close-feature-notifications") {
       markFeatureAnnouncementsRead();
       featureNotificationPanelOpen = false;
+      openedFeatureAnnouncementId = "";
       app();
     }
 
     if (action === "open-feature-module") {
       markFeatureAnnouncementsRead();
       featureNotificationPanelOpen = false;
+      openedFeatureAnnouncementId = "";
       const nextModuleId = actionTarget.dataset.moduleId;
       if (modules.some((module) => module.enabled && module.id === nextModuleId)) {
         activeModuleId = nextModuleId;
@@ -3063,10 +3238,7 @@
     }
 
     if (action === "start-onboarding") {
-      onboardingDraft = null;
-      clearOnboardingDraft();
-      onboardingActive = true;
-      app();
+      await startOnboardingFromCurrentSettings();
     }
 
     if (action === "cancel-onboarding") {
