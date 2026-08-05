@@ -24,9 +24,15 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   background:
     linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 28%),
     linear-gradient(315deg, rgba(245, 158, 11, 0.1), transparent 30%),
@@ -34,10 +40,15 @@ body {
   color: var(--ink);
 }
 
+#app {
+  min-width: 0;
+}
+
 button,
 input,
 select {
   font: inherit;
+  max-width: 100%;
 }
 
 button {
@@ -98,7 +109,7 @@ button {
 
 .showcase-copy h1 {
   margin-bottom: 14px;
-  font-size: clamp(40px, 6vw, 66px);
+  font-size: 58px;
   line-height: 1;
 }
 
@@ -140,7 +151,7 @@ button {
 
 .preview-top strong {
   color: #ffffff;
-  font-size: clamp(26px, 4vw, 38px);
+  font-size: 34px;
   overflow-wrap: anywhere;
 }
 
@@ -219,7 +230,7 @@ button {
 }
 
 .auth-copy h1 {
-  font-size: clamp(28px, 5vw, 38px);
+  font-size: 36px;
   line-height: 1.05;
 }
 
@@ -287,7 +298,7 @@ button {
 }
 
 .onboarding-copy h1 {
-  font-size: clamp(28px, 2.75vw, 38px);
+  font-size: 34px;
   line-height: 1.04;
 }
 
@@ -402,7 +413,7 @@ button {
 }
 
 .onboarding-estimate-time {
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: 26px;
   font-weight: 900;
   line-height: 1.05;
   overflow-wrap: anywhere;
@@ -802,7 +813,7 @@ button {
   font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 h1,
@@ -814,7 +825,7 @@ p {
 
 h1 {
   margin-bottom: 6px;
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: 40px;
   line-height: 1.05;
   letter-spacing: 0;
 }
@@ -958,7 +969,7 @@ button:disabled {
 
 .metric strong {
   display: block;
-  font-size: clamp(20px, 2.5vw, 30px);
+  font-size: 28px;
   line-height: 1.1;
   overflow-wrap: anywhere;
 }
@@ -1007,7 +1018,7 @@ button:disabled {
 }
 
 .freedom-time {
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: 32px;
   font-weight: 900;
   line-height: 1;
   overflow-wrap: anywhere;
@@ -1146,7 +1157,7 @@ button:disabled {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .friends-current-month strong {
@@ -1177,7 +1188,7 @@ th {
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 td {
@@ -2389,7 +2400,7 @@ tbody tr:hover {
   }
 
   .showcase-copy h1 {
-    font-size: clamp(36px, 8vw, 58px);
+    font-size: 46px;
   }
 
   .auth-preview {
@@ -2401,9 +2412,12 @@ tbody tr:hover {
   }
 
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 10;
     height: auto;
     padding: 14px;
+    gap: 14px;
   }
 
   .module-list {
@@ -2467,6 +2481,10 @@ tbody tr:hover {
     display: grid;
   }
 
+  h1 {
+    font-size: 34px;
+  }
+
   .toolbar {
     justify-content: flex-start;
   }
@@ -2523,20 +2541,46 @@ tbody tr:hover {
   .module-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .compact-month,
+  .friends-current-month {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .fund-form,
+  .budget-add.expanded {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {
-  .auth-shell {
-    padding: 12px;
+  html,
+  body {
+    min-width: 320px;
   }
 
-  .auth-showcase,
+  .auth-shell {
+    min-height: 100vh;
+    align-items: start;
+    padding: 10px;
+  }
+
+  .auth-frame {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .auth-showcase {
+    display: none;
+  }
+
   .auth-panel,
   .auth-preview {
     padding: 18px;
   }
 
-  .showcase-copy h1,
   .auth-copy h1 {
     font-size: 30px;
   }
@@ -2556,6 +2600,266 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .app-shell {
+    min-height: 100svh;
+  }
+
+  .sidebar {
+    padding: 10px;
+    gap: 10px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  }
+
+  .brand {
+    min-height: 36px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand strong {
+    font-size: 15px;
+  }
+
+  .brand span {
+    display: none;
+  }
+
+  .module-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .module-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .module-button {
+    width: auto;
+    min-width: max-content;
+    min-height: 42px;
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .module-button[disabled] {
+    display: none;
+  }
+
+  .notification-button {
+    width: 100%;
+  }
+
+  .sidebar-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .sidebar-footer .logout-button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .sidebar-footer .logout-button span:last-child {
+    display: none;
+  }
+
+  .main {
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: 30px;
+  }
+
+  .topbar {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .topbar p:not(.eyebrow) {
+    font-size: 14px;
+  }
+
+  .metric {
+    min-height: 96px;
+    padding: 14px;
+  }
+
+  .metric strong,
+  .freedom-time {
+    font-size: 26px;
+  }
+
+  .freedom-card,
+  .panel-header,
+  .budget-list,
+  .category-list,
+  .form-grid,
+  .friends-body,
+  .category-manager-body,
+  .bucket-form,
+  .fund-form,
+  .fund-card-grid,
+  .profile-summary,
+  .profile-form,
+  .game-board-wrap,
+  .game-progress-list,
+  .notification-list,
+  .notification-detail-view {
+    padding: 14px;
+  }
+
+  .panel-header {
+    gap: 10px;
+  }
+
+  .month-control {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .month-control button,
+  .month-control input,
+  .field input,
+  .field select,
+  .readonly-field {
+    min-height: 44px;
+  }
+
+  .transaction-list {
+    overflow-x: visible;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: #ffffff;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(216, 224, 234, 0.72);
+  }
+
+  td:last-child {
+    border-bottom: 0;
+  }
+
+  td::before {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  td:nth-child(1)::before {
+    content: "Ngày";
+  }
+
+  td:nth-child(2)::before {
+    content: "Danh mục";
+  }
+
+  td:nth-child(3)::before {
+    content: "Ghi chú";
+  }
+
+  td:nth-child(4)::before {
+    content: "Số tiền";
+  }
+
+  td:nth-child(5)::before {
+    content: "Thao tác";
+  }
+
+  .amount {
+    text-align: left;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
+  .actions .button.icon,
+  .friend-remove,
+  .budget-remove {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .category-chart-grid,
+  .budget-card-actions,
+  .profile-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .category-chart-card {
+    min-height: auto;
+  }
+
+  .fund-card,
+  .friend-row,
+  .friend-request-row,
+  .game-progress-row,
+  .category-definition-row,
+  .budget-add,
+  .budget-edit-grid,
+  .budget-card-edit,
+  .category-add,
+  .friend-add,
+  .avatar-upload-box {
+    grid-template-columns: 1fr;
+  }
+
+  .fund-card-top.readonly {
+    grid-template-columns: 1fr;
+  }
+
+  .fund-card-top small,
+  .wordle-mini-board {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .profile-hero,
+  .friend-profile {
+    align-items: flex-start;
+  }
+
   .panel-header,
   .row-top,
   .form-actions {
@@ -2568,7 +2872,91 @@ tbody tr:hover {
   }
 
   .button.icon {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .onboarding-shell {
+    min-height: 100svh;
+    align-items: start;
+    place-items: stretch;
+    padding: 10px;
+  }
+
+  .onboarding-frame {
+    gap: 10px;
+  }
+
+  .onboarding-copy,
+  .onboarding-panel {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .onboarding-copy {
+    max-height: none;
+    gap: 8px;
+    padding: 16px;
+    overflow: visible;
+  }
+
+  .onboarding-copy h1 {
+    font-size: 28px;
+  }
+
+  .onboarding-copy > p,
+  .onboarding-definitions span {
+    font-size: 14px;
+  }
+
+  .onboarding-body {
+    padding: 12px;
+  }
+
+  .onboarding-fund-recommendations {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-budget-row,
+  .onboarding-fund-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .onboarding-row-actions {
+    justify-content: flex-start;
+  }
+
+  .onboarding-row-actions .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .onboarding-estimate-time {
+    font-size: 24px;
+  }
+
+  .notification-layer {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .notification-panel {
     width: 100%;
+    max-height: calc(100svh - 20px);
+  }
+
+  .notification-header {
+    padding: 14px;
+  }
+
+  .notification-card-top {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .notification-actions {
+    padding: 12px 14px 14px;
   }
 
   .wordle-keyboard-row {
