@@ -126,6 +126,31 @@
   ];
   const featureAnnouncements = [
     {
+      id: "transaction-categories-most-used-2026-08-05",
+      badge: "Cải tiến mới",
+      title: "Danh mục giao dịch ưu tiên mục hay dùng",
+      timestamp: "2026-08-05T14:53:49+07:00",
+      timeLabel: "2026-08-05 14:53:49 +07",
+      summary: "Khi thêm Giao dịch, ô Danh mục tự xếp các mục bạn dùng nhiều nhất lên đầu để nhập nhanh hơn.",
+      purpose: [
+        "Giảm thời gian tìm danh mục khi bạn thường xuyên nhập các khoản chi giống nhau.",
+        "Cá nhân hóa thứ tự danh mục theo lịch sử giao dịch của từng tài khoản.",
+        "Giữ danh sách gọn vì vẫn dùng các danh mục bạn đã thiết lập trong tab Danh mục."
+      ],
+      recommended: [
+        "Dùng khi bạn thường nhập các khoản chi lặp lại như Ăn uống, Di chuyển hoặc Dating.",
+        "Dùng khi danh sách danh mục dài và bạn muốn các mục hay chọn nằm ngay phía trên."
+      ],
+      howTo: [
+        "Mở tab Giao dịch.",
+        "Bấm thêm giao dịch mới.",
+        "Mở ô Danh mục; các danh mục dùng nhiều nhất trong lịch sử giao dịch của bạn sẽ nằm trên đầu.",
+        "Nếu chưa có lịch sử giao dịch, thứ tự vẫn theo danh sách Danh mục hiện tại."
+      ],
+      ctaLabel: "Mở Giao dịch",
+      moduleId: "transactions"
+    },
+    {
       id: "friends-current-month-progress-2026-08-04",
       badge: "Cải tiến mới",
       title: "Bạn bè chỉ hiển thị tiến độ tháng hiện tại",
@@ -2699,9 +2724,35 @@
   function transactionCategoryOptions(editing) {
     const categories = definedCategoryOptions();
     if (editing?.category && !categories.includes(editing.category)) {
-      return normalizeCategories([editing.category, ...categories]);
+      return sortTransactionCategoriesByUsage(normalizeCategories([editing.category, ...categories]));
     }
-    return categories;
+    return sortTransactionCategoriesByUsage(categories);
+  }
+
+  function sortTransactionCategoriesByUsage(categories) {
+    const originalOrder = new Map(categories.map((category, index) => [category.toLowerCase(), index]));
+    const usage = transactionCategoryUsageStats();
+    return [...categories].sort((first, second) => {
+      const firstUsage = usage[first.toLowerCase()] || { count: 0, latestIndex: Number.POSITIVE_INFINITY };
+      const secondUsage = usage[second.toLowerCase()] || { count: 0, latestIndex: Number.POSITIVE_INFINITY };
+      if (firstUsage.count !== secondUsage.count) return secondUsage.count - firstUsage.count;
+      if (firstUsage.latestIndex !== secondUsage.latestIndex) return firstUsage.latestIndex - secondUsage.latestIndex;
+      return (originalOrder.get(first.toLowerCase()) || 0) - (originalOrder.get(second.toLowerCase()) || 0);
+    });
+  }
+
+  function transactionCategoryUsageStats() {
+    return state.money.transactions.reduce((stats, transaction, index) => {
+      const category = localizeCategoryName(transaction.category);
+      if (!category) return stats;
+      const key = category.toLowerCase();
+      const current = stats[key] || { count: 0, latestIndex: index };
+      stats[key] = {
+        count: current.count + 1,
+        latestIndex: Math.min(current.latestIndex, index)
+      };
+      return stats;
+    }, {});
   }
 
   function categoryRecordFromApi(category) {
