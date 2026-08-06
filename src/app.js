@@ -126,6 +126,31 @@
   ];
   const featureAnnouncements = [
     {
+      id: "game-wordle-scowl-guesses-2026-08-07",
+      badge: "Cải tiến GAME",
+      title: "Wordle nhận nhiều từ Anh-Mỹ và Anh-Anh hơn",
+      timestamp: "2026-08-07T10:20:00+07:00",
+      timeLabel: "2026-08-07 10:20:00 +07",
+      summary: "Lượt đoán GAME dùng danh sách từ rộng hơn cho cả chính tả Mỹ và Anh, còn đáp án vẫn lấy từ nhóm từ thông dụng.",
+      purpose: [
+        "Giảm trường hợp bạn nhập một từ tiếng Anh 5 chữ hợp lệ nhưng hệ thống không nhận.",
+        "Tách rõ danh sách đáp án và danh sách từ được phép đoán để game công bằng hơn.",
+        "Giữ đáp án hằng ngày trong nhóm từ phổ biến, dễ nhận ra hơn."
+      ],
+      recommended: [
+        "Dùng khi bạn muốn đoán bằng cả cách viết Mỹ hoặc Anh như fiber/fibre hoặc tires/tyres.",
+        "Dùng các từ hiếm hơn để loại chữ, nhưng nhớ đáp án vẫn ưu tiên từ thông dụng."
+      ],
+      howTo: [
+        "Mở tab GAME.",
+        "Nhập một từ tiếng Anh đúng 5 chữ.",
+        "Hệ thống kiểm tra lượt đoán bằng danh sách SCOWL cho từ Mỹ, Anh và biến thể chính tả.",
+        "Đáp án hằng ngày chỉ chọn từ nhóm 5 chữ phổ biến thuộc danh từ, động từ nguyên mẫu hoặc tính từ."
+      ],
+      ctaLabel: "Mở GAME",
+      moduleId: "game"
+    },
+    {
       id: "transaction-categories-most-used-2026-08-05",
       badge: "Cải tiến mới",
       title: "Danh mục giao dịch ưu tiên mục hay dùng",
@@ -906,7 +931,9 @@
     root.innerHTML = `
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">U</div>
+          <div class="brand-mark">
+            <img src="src/assets/app-logo.jpg" alt="Universal App">
+          </div>
           <div>
             <strong>Universal App</strong>
             <span>Điều hành cá nhân</span>
@@ -957,7 +984,9 @@
         <section class="auth-frame">
           <div class="auth-showcase" aria-label="Universal App">
             <div class="auth-brand">
-              <div class="brand-mark">U</div>
+              <div class="brand-mark">
+                <img src="src/assets/app-logo.jpg" alt="Universal App">
+              </div>
               <div>
                 <strong>Universal App</strong>
                 <span>Money workspace</span>

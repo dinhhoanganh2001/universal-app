@@ -273,13 +273,13 @@ def main() -> None:
     assert game_payload["word_length"] == 5, game_payload
     assert game_payload["max_attempts"] == 6, game_payload
     assert game_payload["source_word_count"] == 3000, game_payload
+    assert game_payload["answer_pool_count"] == len(word_pool()), game_payload
     assert game_payload["status"] == "playing", game_payload
 
-    outside_pool_guess = next(
-        word
-        for word in sorted(valid_guess_words() - word_pool())
-        if word != answer_for_date(current_puzzle_date())
-    )
+    outside_pool_guess = "tyres"
+    assert outside_pool_guess in valid_guess_words()
+    assert outside_pool_guess not in word_pool()
+    assert outside_pool_guess != answer_for_date(current_puzzle_date())
     game_guess = client.post("/api/game/guesses", headers=headers, json={"word": outside_pool_guess})
     assert game_guess.status_code == 200, game_guess.text
     game_guess_payload = game_guess.json()
