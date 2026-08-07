@@ -27,11 +27,15 @@
 html {
   width: 100%;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   background:
     linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 28%),
@@ -42,6 +46,8 @@ body {
 
 #app {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 button,
@@ -2565,11 +2571,32 @@ tbody tr:hover {
 @media (max-width: 700px) {
   html,
   body {
-    min-width: 320px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .auth-root,
+  .app-shell,
+  .sidebar,
+  .main,
+  .panel,
+  .metric,
+  .freedom-card,
+  .category-chart-card,
+  .notification-layer,
+  .onboarding-shell {
+    width: 100%;
+    max-width: 100%;
   }
 
   .auth-shell {
-    min-height: 100vh;
+    min-height: 100dvh;
     align-items: start;
     padding: 10px;
   }
@@ -2590,7 +2617,7 @@ tbody tr:hover {
   }
 
   .auth-copy h1 {
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .preview-top,
@@ -2606,29 +2633,39 @@ tbody tr:hover {
 
   .metric-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .app-shell {
-    min-height: 100svh;
+    min-height: 100dvh;
+    overflow-x: hidden;
   }
 
   .sidebar {
-    padding: 10px;
-    gap: 10px;
+    max-width: 100vw;
+    padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
+    gap: 8px;
+    overflow: hidden;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   }
 
   .brand {
     min-height: 36px;
+    min-width: 0;
+    gap: 10px;
   }
 
   .brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
   }
 
   .brand strong {
-    font-size: 15px;
+    font-size: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .brand span {
@@ -2637,10 +2674,12 @@ tbody tr:hover {
 
   .module-list {
     display: flex;
-    gap: 8px;
+    max-width: 100%;
+    gap: 6px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   .module-list::-webkit-scrollbar {
@@ -2650,10 +2689,20 @@ tbody tr:hover {
   .module-button {
     width: auto;
     min-width: max-content;
-    min-height: 42px;
+    max-width: calc(100vw - 16px);
+    min-height: 38px;
     flex: 0 0 auto;
-    padding: 8px 10px;
+    gap: 7px;
+    padding: 7px 9px;
+    font-size: 14px;
+    line-height: 1;
     white-space: nowrap;
+  }
+
+  .module-icon {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
   }
 
   .module-button[disabled] {
@@ -2662,18 +2711,39 @@ tbody tr:hover {
 
   .notification-button {
     width: 100%;
+    min-height: 38px;
+    font-size: 14px;
+  }
+
+  .notification-count {
+    min-width: 20px;
+    height: 20px;
   }
 
   .sidebar-footer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 40px;
     gap: 8px;
     margin-top: 0;
   }
 
+  .account-chip {
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  .profile-avatar-small {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
+
   .sidebar-footer .logout-button {
-    width: 44px;
-    min-width: 44px;
+    width: 40px;
+    min-width: 40px;
+    min-height: 36px;
     padding: 0;
   }
 
@@ -2682,30 +2752,60 @@ tbody tr:hover {
   }
 
   .main {
-    padding: 12px;
+    max-width: 100vw;
+    padding: 10px 10px calc(82px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
 
   h1 {
-    font-size: 30px;
+    font-size: 26px;
+    line-height: 1.12;
   }
 
   .topbar {
+    min-width: 0;
     gap: 10px;
     margin-bottom: 14px;
   }
 
+  .topbar > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .topbar h1,
+  .topbar p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+  }
+
   .topbar p:not(.eyebrow) {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.45;
   }
 
   .metric {
-    min-height: 96px;
-    padding: 14px;
+    min-height: 84px;
+    padding: 12px;
+  }
+
+  .metric span {
+    font-size: 12px;
+    margin-bottom: 6px;
   }
 
   .metric strong,
   .freedom-time {
-    font-size: 26px;
+    font-size: 22px;
+    line-height: 1.08;
+  }
+
+  .metric small {
+    font-size: 12px;
   }
 
   .freedom-card,
@@ -2724,7 +2824,7 @@ tbody tr:hover {
   .game-progress-list,
   .notification-list,
   .notification-detail-view {
-    padding: 14px;
+    padding: 12px;
   }
 
   .panel-header {
@@ -2885,7 +2985,7 @@ tbody tr:hover {
   }
 
   .onboarding-shell {
-    min-height: 100svh;
+    min-height: 100dvh;
     align-items: start;
     place-items: stretch;
     padding: 10px;
@@ -2951,7 +3051,7 @@ tbody tr:hover {
 
   .notification-panel {
     width: 100%;
-    max-height: calc(100svh - 20px);
+    max-height: calc(100dvh - 20px);
   }
 
   .notification-header {
