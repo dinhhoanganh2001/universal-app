@@ -4,7 +4,7 @@
   const ONBOARDING_DRAFT_STORAGE_KEY = "universal-app-onboarding-draft-v1";
   const FEATURE_NOTIFICATION_STORAGE_KEY = "universal-app-feature-notifications-v1";
   const API_BASE_STORAGE_KEY = "universal-app-api-base-url";
-  const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+  const DEFAULT_BACKEND_PORT = "8000";
   const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
   const avatarMimeLabels = {
     "image/jpeg": "JPG",
@@ -776,11 +776,32 @@
   }
 
   function apiBaseUrl() {
-    return runtimeApiBaseUrl() || localStorage.getItem(API_BASE_STORAGE_KEY) || DEFAULT_API_BASE_URL;
+    return runtimeApiBaseUrl() || storedApiBaseUrl() || browserDefaultApiBaseUrl();
   }
 
   function runtimeApiBaseUrl() {
     return String(window.UNIVERSAL_APP_CONFIG?.API_BASE_URL || "").trim().replace(/\/+$/, "");
+  }
+
+  function storedApiBaseUrl() {
+    const storedUrl = String(localStorage.getItem(API_BASE_STORAGE_KEY) || "").trim().replace(/\/+$/, "");
+    if (!storedUrl) return "";
+    if (!isLocalBrowserHost() && isLoopbackApiUrl(storedUrl)) return "";
+    return storedUrl;
+  }
+
+  function browserDefaultApiBaseUrl() {
+    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+    const hostname = window.location.hostname || "127.0.0.1";
+    return `${protocol}//${hostname}:${DEFAULT_BACKEND_PORT}`;
+  }
+
+  function isLocalBrowserHost() {
+    return /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname || "");
+  }
+
+  function isLoopbackApiUrl(url) {
+    return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(?::|\/|$)/.test(url);
   }
 
   function currentMonth() {

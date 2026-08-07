@@ -26,11 +26,7 @@ BACKEND_HOST="${BACKEND_HOST:-${HOST:-127.0.0.1}}"
 BACKEND_PORT="${BACKEND_PORT:-${PORT:-8000}}"
 FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-API_BROWSER_HOST="$BACKEND_HOST"
-if [ "$API_BROWSER_HOST" = "0.0.0.0" ]; then
-  API_BROWSER_HOST="127.0.0.1"
-fi
-API_BASE_URL="${API_BASE_URL:-http://$API_BROWSER_HOST:$BACKEND_PORT}"
+API_BASE_URL="${API_BASE_URL:-}"
 
 if [ ! -d "$VENV_DIR" ]; then
   python3 -m venv "$VENV_DIR"
@@ -39,9 +35,15 @@ fi
 mkdir -p "$LOG_DIR"
 
 cat > "$RUNTIME_CONFIG_FILE" <<EOF
-window.UNIVERSAL_APP_CONFIG = {
-  API_BASE_URL: "$API_BASE_URL"
-};
+window.UNIVERSAL_APP_CONFIG = (() => {
+  const configuredApiBaseUrl = "$API_BASE_URL";
+  const backendPort = "$BACKEND_PORT";
+  const browserHost = window.location.hostname || "127.0.0.1";
+  const browserProtocol = window.location.protocol === "https:" ? "https:" : "http:";
+  return {
+    API_BASE_URL: configuredApiBaseUrl || (browserProtocol + "//" + browserHost + ":" + backendPort)
+  };
+})();
 EOF
 
 cd "$BACKEND_DIR"
@@ -58,7 +60,11 @@ BACKEND_PID=$!
 cd "$ROOT_DIR"
 
 echo "Starting Universal App UI at http://$FRONTEND_HOST:$FRONTEND_PORT"
-echo "Frontend API URL: $API_BASE_URL"
+if [ -n "$API_BASE_URL" ]; then
+  echo "Frontend API URL: $API_BASE_URL"
+else
+  echo "Frontend API URL: browser host on backend port $BACKEND_PORT"
+fi
 nohup python3 -m http.server "$FRONTEND_PORT" --bind "$FRONTEND_HOST" > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 

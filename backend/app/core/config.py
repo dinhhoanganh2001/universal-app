@@ -21,7 +21,10 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
-    backend_cors_origin_regex: str | None = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
+    backend_cors_origin_regex: str | None = (
+        r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|10(?:\.\d{1,3}){3}|"
+        r"192\.168(?:\.\d{1,3}){2}|172\.(1[6-9]|2[0-9]|3[01])(?:\.\d{1,3}){2})(:\d+)?$"
+    )
 
 
 settings = Settings()

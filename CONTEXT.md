@@ -19,7 +19,7 @@ This file is the shared working context for contributors and coding agents. Read
 - Money backend APIs exist for expense transactions, budgets, and monthly summaries.
 - Money category APIs exist for user-defined category names.
 - The frontend login/register screen talks to the backend auth endpoints.
-- The app UI does not expose the API URL; API base configuration comes from generated `src/runtime-config.js`, a previously stored value, or the local default.
+- The app UI does not expose the API URL; API base configuration comes from generated `src/runtime-config.js`, a previously stored value, or a browser-host fallback on backend port 8000. On non-localhost deployments, stale stored loopback API URLs are ignored so the browser does not call `127.0.0.1` on the user's device.
 - After login, the frontend money tracker syncs transactions and budgets with the backend.
 - Frontend current month/date defaults use the browser's local timezone, not UTC ISO serialization, so users ahead of UTC do not see the previous day/month.
 - The sidebar separates `Ngân sách` and `Giao dịch` into their own navigation items.
@@ -80,7 +80,7 @@ FRONTEND_PORT=5174
 Then run `bash start_service.sh` again. The script generates ignored `src/runtime-config.js` so the frontend uses the configured API URL.
 `start_service.sh` launches backend/frontend with `nohup`, returns after writing `.service-pids`, and writes ignored logs under `.service-logs/`.
 
-For LAN/public access, bind to all interfaces but use a reachable URL for browser API calls:
+For LAN/public access, bind to all interfaces. If frontend and backend use the same hostname and the backend is reachable on `BACKEND_PORT`, `API_BASE_URL` may stay empty; the generated frontend config will use the browser's current hostname with the backend port. If frontend/backend use different hostnames, protocols, ports behind a reverse proxy, or HTTPS, set `API_BASE_URL` to the exact API URL users can reach. If the frontend is opened over HTTPS, the API must also be HTTPS.
 
 ```dotenv
 BACKEND_HOST=0.0.0.0
@@ -92,6 +92,7 @@ BACKEND_CORS_ORIGINS='["http://YOUR_SERVER_IP:6060"]'
 ```
 
 Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is assigned directly to the server's network interface. Do not set `API_BASE_URL` to `http://0.0.0.0:4578`; `0.0.0.0` is only a bind address.
+For public domain/IP deployments, `BACKEND_CORS_ORIGINS` must include the exact frontend origin users open in the browser, including scheme and port.
 
 ## Important Files
 
@@ -123,7 +124,7 @@ Do not put the public IP in `BACKEND_HOST` or `FRONTEND_HOST` unless that IP is 
 ## Design Decisions
 
 - Use SQLite by default through `DATABASE_URL`; this can move to Postgres later without changing route logic.
-- Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`, while `API_BASE_URL` and `BACKEND_CORS_ORIGINS` use the real IP/domain reachable by the browser.
+- Use root `.env` for local service ports: `BACKEND_HOST`, `BACKEND_PORT`, `FRONTEND_HOST`, `FRONTEND_PORT`, and optional `API_BASE_URL`. For public/LAN access, bind hosts should usually be `0.0.0.0`. Leave `API_BASE_URL` empty only when the browser can reach the API on the same hostname plus `BACKEND_PORT`; otherwise set it to the real API IP/domain. `BACKEND_CORS_ORIGINS` must include the real frontend origin for public IP/domain deployments.
 - Keep frontend module labels and money UI in Vietnamese.
 - Use local browser date parts for user-facing current month/date defaults; avoid `toISOString()` for those values because it serializes in UTC.
 - UI and UX quality should be treated as a core requirement: flows should be polished, clear, compact, responsive, and easy to use before work is considered complete.
@@ -241,3 +242,4 @@ backend/.venv/bin/python backend/scripts/cors_smoke_test.py
 - Fixed the session duration configuration mismatch: `.env.example`, `backend/.env.example`, and the local ignored `.env` files now use `ACCESS_TOKEN_EXPIRE_MINUTES=43200` instead of `60`, matching the intended 30-day JWT session.
 - Added the provided blue bird/wallet image as `src/assets/app-logo.jpg`, replaced the old `U` brand mark in the sidebar/auth showcase, and set it as the favicon with cache-busting `20260807-logo`.
 - Tightened the iPhone Safari phone layout after `bug7.png`: added `viewport-fit=cover`, disabled Safari text auto-inflation, clamped phone containers to viewport width, reduced compact header/navigation/metric sizing, reserved bottom safe-area space, switched mobile overlays to `100dvh`, and updated frontend asset cache-busting to `20260807-iphone-safari`.
+- Fixed deployed frontend/backend connection defaults: generated runtime config now derives the API host from the browser hostname when `API_BASE_URL` is blank, frontend fallback no longer uses loopback on non-localhost pages, local/private LAN CORS regexes were broadened, deployment env examples now call out exact public frontend origins, and frontend asset cache-busting was updated to `20260807-api-host`.
